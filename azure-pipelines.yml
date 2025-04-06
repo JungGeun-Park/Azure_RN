@@ -66,26 +66,28 @@ steps:
 
 - script: |
     # Increment build number for iOS (Info.plist)
-    INFO_PLIST_PATH="ios/$APP_NAME/Info.plist"
+    INFO_PLIST_PATH="ios/${APP_NAME}/Info.plist"
 
     if [ -f "$INFO_PLIST_PATH" ]; then
-        # 1. CFBundleVersion 변수화 문제 해결
-        # 현재 값이 $(CURRENT_PROJECT_VERSION)인 경우 강제로 숫자 초기화
+        # 1. 변수 확장 문제 해결
         CURRENT_BUILD_NUMBER=$(/usr/libexec/PlistBuddy -c "Print :CFBundleVersion" "$INFO_PLIST_PATH" 2>/dev/null || echo "1")
-        if [[ "$CURRENT_BUILD_NUMBER" == *"$("* ]]; then
+        
+        # 2. 조건식 수정 (정규표현식 사용)
+        if [[ "$CURRENT_BUILD_NUMBER" =~ \$\([A-Z_]+\) ]]; then
             echo "Resetting invalid build number format..."
             /usr/libexec/PlistBuddy -c "Set :CFBundleVersion 1" "$INFO_PLIST_PATH"
             CURRENT_BUILD_NUMBER=1
         fi
 
-        # 2. 빌드 번호 증가
+        # 3. 빌드 번호 증가
         NEW_BUILD_NUMBER=$((CURRENT_BUILD_NUMBER + 1))
         /usr/libexec/PlistBuddy -c "Set :CFBundleVersion $NEW_BUILD_NUMBER" "$INFO_PLIST_PATH"
         echo "Updated iOS build number to $NEW_BUILD_NUMBER."
 
-        # 3. IPHONEOS_DEPLOYMENT_TARGET 처리
-        # 키가 없는 경우 추가 후 설정
-        /usr/libexec/PlistBuddy -c "Add :IPHONEOS_DEPLOYMENT_TARGET string 12.0" "$INFO_PLIST_PATH" 2>/dev/null || true
+        # 4. 배포 대상 설정 (안전한 추가)
+        if ! /usr/libexec/PlistBuddy -c "Print :IPHONEOS_DEPLOYMENT_TARGET" "$INFO_PLIST_PATH" &>/dev/null; then
+            /usr/libexec/PlistBuddy -c "Add :IPHONEOS_DEPLOYMENT_TARGET string 12.0" "$INFO_PLIST_PATH"
+        fi
         /usr/libexec/PlistBuddy -c "Set :IPHONEOS_DEPLOYMENT_TARGET 12.0" "$INFO_PLIST_PATH"
         echo "Set deployment target to iOS 12.0."
     else
