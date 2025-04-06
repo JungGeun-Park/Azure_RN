@@ -19,23 +19,23 @@ parameters:
   default: 'AppSealing Wildcard Distribution Profile'
 
 steps:
-- script: |
-    # Check if Node.js and npm are installed, if not, install them
-    if ! command -v node &> /dev/null || ! command -v npm &> /dev/null; then
-        echo "Node.js or npm is not installed. Installing Node.js..."
-        brew install node
-    else
-        echo "Node.js and npm are already installed."
-    fi
+# - script: |
+#     # Check if Node.js and npm are installed, if not, install them
+#     if ! command -v node &> /dev/null || ! command -v npm &> /dev/null; then
+#         echo "Node.js or npm is not installed. Installing Node.js..."
+#         brew install node
+#     else
+#         echo "Node.js and npm are already installed."
+#     fi
 
-    # Install dependencies for React Native project
-    echo "Installing project dependencies..."
-    npm install
+#     # Install dependencies for React Native project
+#     echo "Installing project dependencies..."
+#     npm install
 
-    # Install CocoaPods for iOS dependencies
-    echo "Installing CocoaPods..."
-    cd ios && pod install && cd ..
-  displayName: 'Setup React Native Environment'
+#     # Install CocoaPods for iOS dependencies
+#     echo "Installing CocoaPods..."
+#     cd ios && pod install && cd ..
+#   displayName: 'Setup React Native Environment'
 
 - script: |
     # Increment build number for iOS (Info.plist)
