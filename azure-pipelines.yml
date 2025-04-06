@@ -38,8 +38,36 @@ steps:
 #   displayName: 'Setup React Native Environment'
 
 - script: |
+    # Define paths for provisioning profile and keychain setup
+    P12_CERT_PATH="$(Build.SourcesDirectory)/ios/distribution.p12"
+    PROVISIONING_PROFILE_PATH="$(Build.SourcesDirectory)/ios/profile.mobileprovision"
+    KEYCHAIN_PATH="$HOME/Library/Keychains/temp-keychain.keychain-db"
+    KEYCHAIN_PASSWORD="temp123"
+
+    # Create a temporary keychain for code signing
+    if security list-keychains | grep -q "temp-keychain.keychain-db"; then
+        echo "Deleting existing temporary keychain..."
+        security delete-keychain "$KEYCHAIN_PATH"
+    fi
+
+    echo "Creating temporary keychain..."
+    security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+
+    echo "Setting temporary keychain as default..."
+    security list-keychains -d user -s "$KEYCHAIN_PATH"
+    security default-keychain -s "$KEYCHAIN_PATH"
+    security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+    security set-keychain-settings -lut 3600 "$KEYCHAIN_PATH"
+
+    echo "Importing distribution certificate (PKCS#12) into temporary keychain..."
+    security import "$P12_CERT_PATH" -k "$KEYCHAIN_PATH" -P "123456" -T /usr/bin/codesign
+    security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+  displayName: 'Setup Temporary Keychain and Install Certificate'
+
+- script: |
     # Increment build number for iOS (Info.plist)
     INFO_PLIST_PATH="ios/YourAppName/Info.plist"
+    
     if [ -f "$INFO_PLIST_PATH" ]; then
         CURRENT_BUILD_NUMBER=$(/usr/libexec/PlistBuddy -c "Print :CFBundleVersion" "$INFO_PLIST_PATH")
         NEW_BUILD_NUMBER=$((CURRENT_BUILD_NUMBER + 1))
@@ -47,77 +75,57 @@ steps:
         echo "Updated iOS build number to $NEW_BUILD_NUMBER."
     else
         echo "Info.plist not found. Skipping iOS build number update."
+        exit 1
     fi
 
-    # Increment versionCode for Android (build.gradle)
-    GRADLE_FILE="android/app/build.gradle"
-    if [ -f "$GRADLE_FILE" ]; then
-        CURRENT_VERSION_CODE=$(grep versionCode $GRADLE_FILE | awk '{print $2}')
-        NEW_VERSION_CODE=$((CURRENT_VERSION_CODE + 1))
-        sed -i '' "s/versionCode $CURRENT_VERSION_CODE/versionCode $NEW_VERSION_CODE/" $GRADLE_FILE
-        echo "Updated Android versionCode to $NEW_VERSION_CODE."
-    else
-        echo "build.gradle not found. Skipping Android versionCode update."
-    fi
-  displayName: 'Increment Build Number'
+    # Ensure minimum deployment target is set in Info.plist
+    /usr/libexec/PlistBuddy -c "Set :IPHONEOS_DEPLOYMENT_TARGET 12.0" "$INFO_PLIST_PATH"
+  displayName: 'Increment Build Number and Set Deployment Target'
 
 - script: |
-    # Build React Native app for iOS
-    echo "Building iOS app..."
-    cd ios && xcodebuild \
-      -workspace YourAppName.xcworkspace \
+    # Build the React Native iOS app using Xcode commands
+    EXPORT_DIR="$(Build.ArtifactStagingDirectory)"
+    IPA_PATH="$EXPORT_DIR/YourAppName.ipa"
+    ARCHIVE_PATH="$EXPORT_DIR/YourAppName.xcarchive"
+    
+    xcodebuild clean archive \
+      -workspace ios/YourAppName.xcworkspace \
       -scheme YourAppName \
       -sdk iphoneos \
       -configuration Release \
-      archive \
-      -archivePath ../build/YourAppName.xcarchive \
       CODE_SIGN_IDENTITY="Apple Distribution" \
+      DEVELOPMENT_TEAM="${{ parameters.TEAM_ID }}" \
       PROVISIONING_PROFILE_SPECIFIER="${{ parameters.PROVISIONING_PROFILE_NAME }}" \
-      DEVELOPMENT_TEAM="${{ parameters.TEAM_ID }}"
-    
+      -archivePath "$ARCHIVE_PATH"
+
     xcodebuild -exportArchive \
-      -archivePath ../build/YourAppName.xcarchive \
-      -exportOptionsPlist ../ExportOptions.plist \
-      -exportPath ../build/
-    
-    echo "iOS app built successfully."
-  displayName: 'Build iOS App'
+      -archivePath "$ARCHIVE_PATH" \
+      -exportOptionsPlist "$(Build.SourcesDirectory)/ios/ExportOptions.plist" \
+      -exportPath "$EXPORT_DIR"
+
+    echo "IPA successfully exported at $IPA_PATH."
+  displayName: 'Build and Export IPA'
 
 - script: |
-    # Build React Native app for Android
-    echo "Building Android app..."
-    cd android && ./gradlew assembleRelease && cd ..
-    
-    APK_PATH=$(find android/app/build/outputs/apk/release -name "*.apk" | head -n 1)
-    echo "Android APK built successfully at $APK_PATH."
-  displayName: 'Build Android App'
-
-- script: |
-    # Upload iOS IPA to TestFlight
-    IPA_PATH=$(find build -name "*.ipa" | head -n 1)
+    # Upload the IPA file to TestFlight using altool
+    IPA_PATH=$(find "$(Build.ArtifactStagingDirectory)" -type f -name "*.ipa" | head -n 1)
     
     if [ -f "$IPA_PATH" ]; then
-        xcrun altool --upload-app -f "$IPA_PATH" -t ios -u "${{ parameters.APPLE_ID }}" -p "${{ parameters.APP_SPECIFIC_PASSWORD }}"
-        echo "Uploaded iOS IPA to TestFlight."
+        xcrun altool --upload-app \
+          -f "$IPA_PATH" \
+          -t ios \
+          -u "${{ parameters.APPLE_ID }}" \
+          -p "${{ parameters.APP_SPECIFIC_PASSWORD }}"
+        
+        echo "Uploaded IPA to TestFlight successfully."
     else
         echo "IPA file not found. Skipping upload."
         exit 1
     fi
-
-    # Upload Android APK to Google Play (requires Fastlane setup)
-    APK_PATH=$(find android/app/build/outputs/apk/release -name "*.apk" | head -n 1)
-    
-    if [ -f "$APK_PATH" ]; then
-        fastlane supply --apk "$APK_PATH" --track beta --json_key ./path/to/your-service-account.json --package_name your.package.name
-        echo "Uploaded Android APK to Google Play Beta."
-    else
-        echo "APK file not found. Skipping upload."
-        exit 1
-    fi
-  displayName: 'Upload Apps to Stores'
+  displayName: 'Upload to TestFlight'
 
 - script: |
-    # Cleanup temporary files or keychains if necessary (iOS-specific)
+    # Cleanup temporary keychain and build artifacts
     TEMP_KEYCHAIN_PATH="$HOME/Library/Keychains/temp-keychain.keychain-db"
     
     if [ -f "$TEMP_KEYCHAIN_PATH" ]; then
@@ -127,8 +135,7 @@ steps:
         echo "Temporary keychain not found. Skipping deletion."
     fi
     
-    # Cleanup build directories for both platforms
-    rm -rf build android/app/build ios/build ios/Pods ios/Podfile.lock
+    rm -rf "$(Build.ArtifactStagingDirectory)" ios/build ios/Pods ios/Podfile.lock
     
     echo "Cleanup completed."
   displayName: 'Cleanup Temporary Files'
