@@ -97,12 +97,30 @@ steps:
   displayName: 'Increment Build Number and Set Deployment Target'
 
 - script: |
-    # CocoaPods 설치 강화
+    npm install
+  displayName: 'Install Node Modules'
+
+- script: |
+    brew uninstall cocoapods --force || true
+    sudo gem install cocoapods -n /usr/local/bin
+    pod --version
+  displayName: 'Reinstall CocoaPods'
+
+- script: |
+    gem install bundler
+    bundle install
+    gem pristine ffi --version 1.16.3
+  displayName: 'Fix Ruby Gems'
+
+- script: |
     cd ios
     pod deintegrate
+    cd ..
+    npm install
+    cd ios
     pod install --repo-update
     cd ..
-  displayName: 'Install CocoaPods Dependencies'
+  displayName: 'Install Pod Dependencies'
 
 - script: |  # Bundle ID 추출 단계 추가
     INFO_PLIST_PATH="ios/${APP_NAME}/Info.plist"
