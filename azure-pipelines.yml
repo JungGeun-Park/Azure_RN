@@ -20,203 +20,115 @@ parameters:
 
 steps:
 - script: |
-    # Check if Flutter is installed, if not, install it
-    if ! command -v flutter &> /dev/null
-    then
-        echo "Flutter is not installed. Installing Flutter..."
-
-        # Install dependencies
-        brew install --cask flutter
-
-        # Verify installation
-        flutter --version
+    # Check if Node.js and npm are installed, if not, install them
+    if ! command -v node &> /dev/null || ! command -v npm &> /dev/null; then
+        echo "Node.js or npm is not installed. Installing Node.js..."
+        brew install node
     else
-        echo "Flutter is already installed."
-    fi
-    
-    # Define paths
-    P12_CERT_PATH="$(Build.SourcesDirectory)/ios/distribution.p12"
-    PROVISIONING_PROFILE_PATH="$(Build.SourcesDirectory)/ios/profile.mobileprovision"
-    KEYCHAIN_PATH="$HOME/Library/Keychains/temp-keychain.keychain-db"
-    KEYCHAIN_PASSWORD="temp123"
-
-    if security list-keychains | grep -q "temp-keychain.keychain-db"; then
-        echo "Deleting existing temporary keychain..."
-        security delete-keychain "$KEYCHAIN_PATH"
+        echo "Node.js and npm are already installed."
     fi
 
-    echo "Creating temporary keychain..."
-    security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+    # Install dependencies for React Native project
+    echo "Installing project dependencies..."
+    npm install
 
-    echo "Setting temporary keychain as default..."
-    security list-keychains -d user -s "$KEYCHAIN_PATH"
-    security default-keychain -s "$KEYCHAIN_PATH"
-    security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
-    security set-keychain-settings -lut 3600 "$KEYCHAIN_PATH"
-
-    echo "Importing distribution certificate (PKCS#12) into temporary keychain..."
-    security import "$P12_CERT_PATH" -k "$KEYCHAIN_PATH" -P "123456" -T /usr/bin/codesign
-    security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
-    security find-identity -v "$KEYCHAIN_PATH"
-  displayName: 'Setup Temporary Keychain and Install Certificate'
+    # Install CocoaPods for iOS dependencies
+    echo "Installing CocoaPods..."
+    cd ios && pod install && cd ..
+  displayName: 'Setup React Native Environment'
 
 - script: |
-    # Flutter 프로젝트에서 iOS 설정 확인
-    SCHEME_NAME=$(flutter doctor -v | grep -A 1 "iOS toolchain" | tail -n 1 | awk '{print $1}')
-    APP_NAME="Runner"
-    echo "##vso[task.setvariable variable=SCHEME_NAME]$SCHEME_NAME"
-    echo "##vso[task.setvariable variable=APP_NAME]$APP_NAME"
-    echo "##vso[task.logissue type=warning] Extracted SCHEME_NAME: $SCHEME_NAME"
-    echo "##vso[task.logissue type=warning] Extracted APP_NAME: $APP_NAME"
-  displayName: 'Extract Scheme and App Name'
+    # Increment build number for iOS (Info.plist)
+    INFO_PLIST_PATH="ios/YourAppName/Info.plist"
+    if [ -f "$INFO_PLIST_PATH" ]; then
+        CURRENT_BUILD_NUMBER=$(/usr/libexec/PlistBuddy -c "Print :CFBundleVersion" "$INFO_PLIST_PATH")
+        NEW_BUILD_NUMBER=$((CURRENT_BUILD_NUMBER + 1))
+        /usr/libexec/PlistBuddy -c "Set :CFBundleVersion $NEW_BUILD_NUMBER" "$INFO_PLIST_PATH"
+        echo "Updated iOS build number to $NEW_BUILD_NUMBER."
+    else
+        echo "Info.plist not found. Skipping iOS build number update."
+    fi
 
-- script: |
-    # Increment build number in Flutter project
-    cd "$(Build.SourcesDirectory)"
-    flutter pub get
-
-    # Fetch the current build number
-    CURRENT_BUILD_NUMBER=$(agvtool what-version -terse)
-    NEW_BUILD_NUMBER=$((CURRENT_BUILD_NUMBER + 1))
-
-    # Set the new build number using agvtool
-    agvtool next-version -all
-    NEW_BUILD_NUMBER=$(agvtool what-version -terse)
-    echo "##vso[task.setvariable variable=BUILD_NUMBER]$NEW_BUILD_NUMBER"
-    echo "##vso[task.logissue type=warning] New Build Number: $NEW_BUILD_NUMBER"
+    # Increment versionCode for Android (build.gradle)
+    GRADLE_FILE="android/app/build.gradle"
+    if [ -f "$GRADLE_FILE" ]; then
+        CURRENT_VERSION_CODE=$(grep versionCode $GRADLE_FILE | awk '{print $2}')
+        NEW_VERSION_CODE=$((CURRENT_VERSION_CODE + 1))
+        sed -i '' "s/versionCode $CURRENT_VERSION_CODE/versionCode $NEW_VERSION_CODE/" $GRADLE_FILE
+        echo "Updated Android versionCode to $NEW_VERSION_CODE."
+    else
+        echo "build.gradle not found. Skipping Android versionCode update."
+    fi
   displayName: 'Increment Build Number'
 
 - script: |
-    INFO_PLIST_PATH="$(Build.SourcesDirectory)/ios/Runner/Info.plist"
+    # Build React Native app for iOS
+    echo "Building iOS app..."
+    cd ios && xcodebuild \
+      -workspace YourAppName.xcworkspace \
+      -scheme YourAppName \
+      -sdk iphoneos \
+      -configuration Release \
+      archive \
+      -archivePath ../build/YourAppName.xcarchive \
+      CODE_SIGN_IDENTITY="Apple Distribution" \
+      PROVISIONING_PROFILE_SPECIFIER="${{ parameters.PROVISIONING_PROFILE_NAME }}" \
+      DEVELOPMENT_TEAM="${{ parameters.TEAM_ID }}"
+    
+    xcodebuild -exportArchive \
+      -archivePath ../build/YourAppName.xcarchive \
+      -exportOptionsPlist ../ExportOptions.plist \
+      -exportPath ../build/
+    
+    echo "iOS app built successfully."
+  displayName: 'Build iOS App'
 
-    # 1. Info.plist에서 직접 추출 시도
-    if [ -f "$INFO_PLIST_PATH" ]; then
-        echo "Info.plist에서 CFBundleIdentifier 추색 중..."
-        BUNDLE_ID=$(/usr/libexec/PlistBuddy -c "Print :CFBundleIdentifier" "$INFO_PLIST_PATH" 2>/dev/null)
-        
-        # 변수 미확인 시 Xcode 빌드 설정에서 추출
-        if [[ "$BUNDLE_ID" == *"$"* ]]; then
-            echo "변수 감지. Xcode 빌드 설정에서 PRODUCT_BUNDLE_IDENTIFIER 검색..."
-            BUNDLE_ID=$(xcodebuild -showBuildSettings \
-                        -project "$(Build.SourcesDirectory)/ios/Runner.xcodeproj" \
-                        -scheme Runner \
-                        -configuration Release \
-                        -sdk iphoneos |
-                        grep -E '^\s*PRODUCT_BUNDLE_IDENTIFIER\s*=' |
-                        awk -F '=' '{print $2}' |
-                        sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')
-        fi
+- script: |
+    # Build React Native app for Android
+    echo "Building Android app..."
+    cd android && ./gradlew assembleRelease && cd ..
+    
+    APK_PATH=$(find android/app/build/outputs/apk/release -name "*.apk" | head -n 1)
+    echo "Android APK built successfully at $APK_PATH."
+  displayName: 'Build Android App'
+
+- script: |
+    # Upload iOS IPA to TestFlight
+    IPA_PATH=$(find build -name "*.ipa" | head -n 1)
+    
+    if [ -f "$IPA_PATH" ]; then
+        xcrun altool --upload-app -f "$IPA_PATH" -t ios -u "${{ parameters.APPLE_ID }}" -p "${{ parameters.APP_SPECIFIC_PASSWORD }}"
+        echo "Uploaded iOS IPA to TestFlight."
     else
-        # 2. Info.plist 없을 경우 Xcode 빌드 설정에서 직접 추출
-        echo "Info.plist 없음. Xcode 빌드 설정에서 추출..."
-        BUNDLE_ID=$(xcodebuild -showBuildSettings \
-                    -project "$(Build.SourcesDirectory)/ios/Runner.xcodeproj" \
-                    -scheme Runner \
-                    -configuration Release \
-                    -sdk iphoneos |
-                    grep -E '^\s*PRODUCT_BUNDLE_IDENTIFIER\s*=' |
-                    awk -F '=' '{print $2}' |
-                    sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')
-    fi
-
-    # 최종 검증
-    if [ -z "$BUNDLE_ID" ]; then
-        echo "##vso[task.logissue type=error] Bundle identifier not found!"
+        echo "IPA file not found. Skipping upload."
         exit 1
     fi
 
-    echo "Final BUNDLE_ID: $BUNDLE_ID"
-    echo "##vso[task.setvariable variable=BUNDLE_ID]$BUNDLE_ID"
-    echo "##vso[task.logissue type=warning] Extracted Bundle ID: $BUNDLE_ID"
-
-    # Create ExportOptions.plist after extracting the Bundle ID
-    EXPORT_DIR="$(Build.ArtifactStagingDirectory)"  # 절대 경로로 통일
-    mkdir -p "$EXPORT_DIR"
-
-    cat << EOF > "$EXPORT_DIR/ExportOptions.plist"
-    <?xml version="1.0" encoding="UTF-8"?>
-    <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-    <plist version="1.0">
-    <dict>
-        <key>method</key>
-        <string>app-store</string>
-        <key>teamID</key>
-        <string>${{ parameters.TEAM_ID }}</string>
-        <key>provisioningProfiles</key>
-        <dict>
-            <key>$BUNDLE_ID</key>
-            <string>${{ parameters.PROVISIONING_PROFILE_NAME }}</string>
-        </dict>
-    </dict>
-    </plist>
-    EOF
-
-    echo "ExportOptions.plist created with provisioningProfiles and bundle ID."
-    cat "$EXPORT_DIR/ExportOptions.plist"  # Output the created plist content for debugging
-  displayName: 'Extract Bundle ID and Create ExportOptions.plist'
+    # Upload Android APK to Google Play (requires Fastlane setup)
+    APK_PATH=$(find android/app/build/outputs/apk/release -name "*.apk" | head -n 1)
+    
+    if [ -f "$APK_PATH" ]; then
+        fastlane supply --apk "$APK_PATH" --track beta --json_key ./path/to/your-service-account.json --package_name your.package.name
+        echo "Uploaded Android APK to Google Play Beta."
+    else
+        echo "APK file not found. Skipping upload."
+        exit 1
+    fi
+  displayName: 'Upload Apps to Stores'
 
 - script: |
-    # Define paths for Flutter iOS build
-    EXPORT_DIR="$(Build.ArtifactStagingDirectory)"
-    IPA_PATH="$EXPORT_DIR/$(APP_NAME).ipa"
-    ARCHIVE_PATH="$EXPORT_DIR/$(APP_NAME).xcarchive"
-    WORKSPACE_PATH="$(Build.SourcesDirectory)/ios/Runner.xcworkspace"
-
-    # Ensure minimum deployment target is set
-    /usr/libexec/PlistBuddy -c "Set :IPHONEOS_DEPLOYMENT_TARGET 12.0" "$(Build.SourcesDirectory)/ios/Runner/Info.plist"
-
-    # Build iOS Flutter app
-    flutter build ios --release --no-codesign
-
-    # Create .xcarchive
-    xcodebuild -workspace "$WORKSPACE_PATH" \
-               -scheme 'Runner' \
-               -sdk iphoneos \
-               -configuration 'Release' \
-               clean archive \
-               CODE_SIGN_IDENTITY="Apple Distribution" \
-               CODE_SIGN_STYLE="Manual" \
-               DEVELOPMENT_TEAM="${{ parameters.TEAM_ID }}" \
-               PROVISIONING_PROFILE_SPECIFIER="${{ parameters.PROVISIONING_PROFILE_NAME }}" \
-               -archivePath "$ARCHIVE_PATH"
-
-    # Export IPA file
-    xcodebuild -exportArchive \
-      -archivePath "$ARCHIVE_PATH" \
-      -exportOptionsPlist "$EXPORT_DIR/ExportOptions.plist" \
-      -exportPath "$EXPORT_DIR"
-
-    echo "IPA successfully exported: $IPA_PATH"
-  displayName: 'Build and Export IPA'
-
-- script: |
-    # Grant execution permission to generate_hash script
-    HASH_SCRIPT_PATH="$(Build.SourcesDirectory)/ios/AppSealingSDK/Tools/generate_hash"
-    EXPORT_DIR="$(Build.ArtifactStagingDirectory)"
-    IPA_PATH=$(find "$EXPORT_DIR" -type f -name "*.ipa" | head -n 1)
-
-    echo "Granting execution permission to generate_hash..."
-    chmod +x "$HASH_SCRIPT_PATH"
-
-    echo "Running generate_hash with IPA..."
-    "$HASH_SCRIPT_PATH" "$IPA_PATH"
-  displayName: 'Run generate_hash on IPA'
-
-- script: |
-    EXPORT_DIR="$(Build.ArtifactStagingDirectory)"
-    IPA_PATH=$(find "$EXPORT_DIR" -type f -name "*.ipa" | head -n 1)
-    set -x
-    xcrun altool --upload-app -f "$IPA_PATH" -t ios -u "${{ parameters.APPLE_ID }}" -p "${{ parameters.APP_SPECIFIC_PASSWORD }}"
-  displayName: 'Upload to TestFlight'
-
-- script: |
-    echo "Deleting temporary keychain..."
+    # Cleanup temporary files or keychains if necessary (iOS-specific)
     TEMP_KEYCHAIN_PATH="$HOME/Library/Keychains/temp-keychain.keychain-db"
+    
     if [ -f "$TEMP_KEYCHAIN_PATH" ]; then
-        # Delete only the temporary keychain, not the default login keychain
         security delete-keychain "$TEMP_KEYCHAIN_PATH"
         echo "Temporary keychain deleted successfully."
     else
         echo "Temporary keychain not found. Skipping deletion."
     fi
-  displayName: 'Cleanup Temporary Keychain'
+    
+    # Cleanup build directories for both platforms
+    rm -rf build android/app/build ios/build ios/Pods ios/Podfile.lock
+    
+    echo "Cleanup completed."
+  displayName: 'Cleanup Temporary Files'
