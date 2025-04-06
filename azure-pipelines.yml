@@ -120,22 +120,23 @@ steps:
     mkdir -p "$EXPORT_DIR"
     
     cat <<EOF > "$EXPORT_DIR/ExportOptions.plist"
-<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<plist version="1.0">
-<dict>
-    <key>method</key>
-    <string>app-store</string>
-    <key>teamID</key>
-    <string>${{ parameters.TEAM_ID }}</string>
-    <key>provisioningProfiles</key>
-    <dict>
-        <key>${BUNDLE_ID}</key>
-        <string>${{ parameters.PROVISIONING_PROFILE_NAME }}</string>
-    </dict>
-</dict>
-</plist>
-EOF
+  <?xml version="1.0" encoding="UTF-8"?>
+  <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+  <plist version="1.0">
+  <dict>
+      <key>method</key>
+      <string>app-store</string>
+      <key>teamID</key>
+      <string>${{ parameters.TEAM_ID }}</string>
+      <key>provisioningProfiles</key>
+      <dict>
+          <key>$BUNDLE_ID</key>
+          <string>${{ parameters.PROVISIONING_PROFILE_NAME }}</string>
+      </dict>
+  </dict>
+  </plist>
+  EOF
+  
   displayName: 'Generate ExportOptions.plist'
 
 - script: |  # 단일 Build and Export IPA 단계로 통합
@@ -168,7 +169,7 @@ EOF
     
     echo "IPA exported to: $EXPORT_DIR"
   displayName: 'Build and Export IPA'
-  
+
 - script: |
     # Upload the IPA file to TestFlight using altool
     IPA_PATH=$(find "$(Build.ArtifactStagingDirectory)" -type f -name "*.ipa" | head -n 1)
