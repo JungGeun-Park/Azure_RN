@@ -19,23 +19,23 @@ parameters:
   default: 'AppSealing Wildcard Distribution Profile'
 
 steps:
-# - script: |
-#     # Check if Node.js and npm are installed, if not, install them
-#     if ! command -v node &> /dev/null || ! command -v npm &> /dev/null; then
-#         echo "Node.js or npm is not installed. Installing Node.js..."
-#         brew install node
-#     else
-#         echo "Node.js and npm are already installed."
-#     fi
+- script: |
+    # Automatically detect the app name from the iOS directory
+    IOS_PATH="ios"
+    if [ -d "$IOS_PATH" ]; then
+        APP_NAME=$(ls "$IOS_PATH" | grep ".xcodeproj" | sed 's/.xcodeproj//')
+        if [ -z "$APP_NAME" ]; then
+            echo "No Xcode project found in the iOS directory."
+            exit 1
+        fi
+    else
+        echo "iOS directory not found."
+        exit 1
+    fi
 
-#     # Install dependencies for React Native project
-#     echo "Installing project dependencies..."
-#     npm install
-
-#     # Install CocoaPods for iOS dependencies
-#     echo "Installing CocoaPods..."
-#     cd ios && pod install && cd ..
-#   displayName: 'Setup React Native Environment'
+    echo "Detected app name: $APP_NAME"
+    echo "##vso[task.setvariable variable=APP_NAME]$APP_NAME"
+  displayName: 'Detect App Name'
 
 - script: |
     # Define paths for provisioning profile and keychain setup
@@ -66,8 +66,8 @@ steps:
 
 - script: |
     # Increment build number for iOS (Info.plist)
-    INFO_PLIST_PATH="ios/YourAppName/Info.plist"
-    
+    INFO_PLIST_PATH="ios/$APP_NAME/Info.plist"
+
     if [ -f "$INFO_PLIST_PATH" ]; then
         CURRENT_BUILD_NUMBER=$(/usr/libexec/PlistBuddy -c "Print :CFBundleVersion" "$INFO_PLIST_PATH")
         NEW_BUILD_NUMBER=$((CURRENT_BUILD_NUMBER + 1))
@@ -85,12 +85,12 @@ steps:
 - script: |
     # Build the React Native iOS app using Xcode commands
     EXPORT_DIR="$(Build.ArtifactStagingDirectory)"
-    IPA_PATH="$EXPORT_DIR/YourAppName.ipa"
-    ARCHIVE_PATH="$EXPORT_DIR/YourAppName.xcarchive"
-    
+    IPA_PATH="$EXPORT_DIR/$APP_NAME.ipa"
+    ARCHIVE_PATH="$EXPORT_DIR/$APP_NAME.xcarchive"
+
     xcodebuild clean archive \
-      -workspace ios/YourAppName.xcworkspace \
-      -scheme YourAppName \
+      -workspace ios/$APP_NAME.xcworkspace \
+      -scheme $APP_NAME \
       -sdk iphoneos \
       -configuration Release \
       CODE_SIGN_IDENTITY="Apple Distribution" \
@@ -109,14 +109,14 @@ steps:
 - script: |
     # Upload the IPA file to TestFlight using altool
     IPA_PATH=$(find "$(Build.ArtifactStagingDirectory)" -type f -name "*.ipa" | head -n 1)
-    
+
     if [ -f "$IPA_PATH" ]; then
         xcrun altool --upload-app \
           -f "$IPA_PATH" \
           -t ios \
           -u "${{ parameters.APPLE_ID }}" \
           -p "${{ parameters.APP_SPECIFIC_PASSWORD }}"
-        
+
         echo "Uploaded IPA to TestFlight successfully."
     else
         echo "IPA file not found. Skipping upload."
@@ -127,15 +127,15 @@ steps:
 - script: |
     # Cleanup temporary keychain and build artifacts
     TEMP_KEYCHAIN_PATH="$HOME/Library/Keychains/temp-keychain.keychain-db"
-    
+
     if [ -f "$TEMP_KEYCHAIN_PATH" ]; then
         security delete-keychain "$TEMP_KEYCHAIN_PATH"
         echo "Temporary keychain deleted successfully."
     else
         echo "Temporary keychain not found. Skipping deletion."
     fi
-    
+
     rm -rf "$(Build.ArtifactStagingDirectory)" ios/build ios/Pods ios/Podfile.lock
-    
+
     echo "Cleanup completed."
   displayName: 'Cleanup Temporary Files'
