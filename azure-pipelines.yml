@@ -97,6 +97,59 @@ steps:
   displayName: 'Increment Build Number and Set Deployment Target'
 
 - script: |
+    # CocoaPods 설치 강화
+    cd ios
+    pod deintegrate
+    pod install --repo-update
+    cd ..
+  displayName: 'Install CocoaPods Dependencies'
+
+- script: |
+    # ExportOptions.plist 생성 (들여쓰기 문제 해결)
+    EXPORT_DIR="$(Build.ArtifactStagingDirectory)"
+    mkdir -p "$EXPORT_DIR"
+    
+    cat <<EOF > "$EXPORT_DIR/ExportOptions.plist"
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>method</key>
+    <string>app-store</string>
+    <key>teamID</key>
+    <string>${{ parameters.TEAM_ID }}</string>
+    <key>provisioningProfiles</key>
+    <dict>
+        <key>$BUNDLE_ID</key>
+        <string>${{ parameters.PROVISIONING_PROFILE_NAME }}</string>
+    </dict>
+</dict>
+</plist>
+EOF
+  displayName: 'Generate ExportOptions.plist'
+
+- script: |
+    # Xcode 빌드 명령어 수정
+    EXPORT_DIR="$(Build.ArtifactStagingDirectory)"
+    ARCHIVE_PATH="$EXPORT_DIR/Azure_RN078.xcarchive"
+    
+    xcodebuild clean archive \
+      -workspace "$(Build.SourcesDirectory)/ios/Azure_RN078.xcworkspace" \
+      -scheme Azure_RN078 \
+      -sdk iphoneos \
+      -configuration Release \
+      CODE_SIGN_IDENTITY="Apple Distribution" \
+      DEVELOPMENT_TEAM="${{ parameters.TEAM_ID }}" \
+      PROVISIONING_PROFILE_SPECIFIER="${{ parameters.PROVISIONING_PROFILE_NAME }}" \
+      -archivePath "$ARCHIVE_PATH"
+    
+    xcodebuild -exportArchive \
+      -archivePath "$ARCHIVE_PATH" \
+      -exportOptionsPlist "$EXPORT_DIR/ExportOptions.plist" \
+      -exportPath "$EXPORT_DIR"
+  displayName: 'Build and Export IPA'
+  
+- script: |
     # Build the React Native iOS app using Xcode commands
     EXPORT_DIR="$(Build.ArtifactStagingDirectory)"
     IPA_PATH="$EXPORT_DIR/$APP_NAME.ipa"
