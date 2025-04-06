@@ -104,8 +104,18 @@ steps:
     cd ..
   displayName: 'Install CocoaPods Dependencies'
 
-- script: |
-    # ExportOptions.plist 생성 (들여쓰기 문제 해결)
+- script: |  # Bundle ID 추출 단계 추가
+    INFO_PLIST_PATH="ios/${APP_NAME}/Info.plist"
+    if [ -f "$INFO_PLIST_PATH" ]; then
+        BUNDLE_ID=$(/usr/libexec/PlistBuddy -c "Print :CFBundleIdentifier" "$INFO_PLIST_PATH")
+        echo "##vso[task.setvariable variable=BUNDLE_ID]$BUNDLE_ID"
+    else
+        echo "##vso[task.logissue type=error] Info.plist not found!"
+        exit 1
+    fi
+  displayName: 'Extract Bundle ID'
+
+- script: |  # ExportOptions.plist 생성 단계 수정
     EXPORT_DIR="$(Build.ArtifactStagingDirectory)"
     mkdir -p "$EXPORT_DIR"
     
@@ -120,7 +130,7 @@ steps:
     <string>${{ parameters.TEAM_ID }}</string>
     <key>provisioningProfiles</key>
     <dict>
-        <key>$BUNDLE_ID</key>
+        <key>${BUNDLE_ID}</key>
         <string>${{ parameters.PROVISIONING_PROFILE_NAME }}</string>
     </dict>
 </dict>
@@ -128,51 +138,37 @@ steps:
 EOF
   displayName: 'Generate ExportOptions.plist'
 
-- script: |
-    # Xcode 빌드 명령어 수정
+- script: |  # 단일 Build and Export IPA 단계로 통합
     EXPORT_DIR="$(Build.ArtifactStagingDirectory)"
-    ARCHIVE_PATH="$EXPORT_DIR/Azure_RN078.xcarchive"
+    ARCHIVE_PATH="$EXPORT_DIR/${APP_NAME}.xcarchive"
     
+    # 1. .xcworkspace 존재 확인
+    WORKSPACE_PATH="$(Build.SourcesDirectory)/ios/${APP_NAME}.xcworkspace"
+    if [ ! -d "$WORKSPACE_PATH" ]; then
+        echo "##vso[task.logissue type=error] .xcworkspace not found: $WORKSPACE_PATH"
+        exit 1
+    fi
+
+    # 2. 아카이브 빌드
     xcodebuild clean archive \
-      -workspace "$(Build.SourcesDirectory)/ios/Azure_RN078.xcworkspace" \
-      -scheme Azure_RN078 \
+      -workspace "$WORKSPACE_PATH" \
+      -scheme "$APP_NAME" \
       -sdk iphoneos \
       -configuration Release \
       CODE_SIGN_IDENTITY="Apple Distribution" \
       DEVELOPMENT_TEAM="${{ parameters.TEAM_ID }}" \
       PROVISIONING_PROFILE_SPECIFIER="${{ parameters.PROVISIONING_PROFILE_NAME }}" \
       -archivePath "$ARCHIVE_PATH"
-    
+
+    # 3. IPA 내보내기
     xcodebuild -exportArchive \
       -archivePath "$ARCHIVE_PATH" \
       -exportOptionsPlist "$EXPORT_DIR/ExportOptions.plist" \
       -exportPath "$EXPORT_DIR"
+    
+    echo "IPA exported to: $EXPORT_DIR"
   displayName: 'Build and Export IPA'
   
-- script: |
-    # Build the React Native iOS app using Xcode commands
-    EXPORT_DIR="$(Build.ArtifactStagingDirectory)"
-    IPA_PATH="$EXPORT_DIR/$APP_NAME.ipa"
-    ARCHIVE_PATH="$EXPORT_DIR/$APP_NAME.xcarchive"
-
-    xcodebuild clean archive \
-      -workspace ios/$APP_NAME.xcworkspace \
-      -scheme $APP_NAME \
-      -sdk iphoneos \
-      -configuration Release \
-      CODE_SIGN_IDENTITY="Apple Distribution" \
-      DEVELOPMENT_TEAM="${{ parameters.TEAM_ID }}" \
-      PROVISIONING_PROFILE_SPECIFIER="${{ parameters.PROVISIONING_PROFILE_NAME }}" \
-      -archivePath "$ARCHIVE_PATH"
-
-    xcodebuild -exportArchive \
-      -archivePath "$ARCHIVE_PATH" \
-      -exportOptionsPlist "$(Build.SourcesDirectory)/ios/ExportOptions.plist" \
-      -exportPath "$EXPORT_DIR"
-
-    echo "IPA successfully exported at $IPA_PATH."
-  displayName: 'Build and Export IPA'
-
 - script: |
     # Upload the IPA file to TestFlight using altool
     IPA_PATH=$(find "$(Build.ArtifactStagingDirectory)" -type f -name "*.ipa" | head -n 1)
