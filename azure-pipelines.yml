@@ -281,63 +281,68 @@ steps:
 - script: |
     # Copy hermes files from AppSealingSDK to the Pods directory
     echo "Copying hermes files from AppSealingSDK to the Pods directory..."
-    
+
     # Source directories (search for hermes files in AppSealingSDK)
     APP_SEALING_SDK_DIR="$(Build.SourcesDirectory)/ios/AppSealingSDK"
     HERMES_SOURCE_FILES=$(find "$APP_SEALING_SDK_DIR" -name "*hermes*" -type f 2>/dev/null || echo "")
-    
+
     # Log available hermes files
     echo "Found the following hermes files in AppSealingSDK:"
     for FILE in $HERMES_SOURCE_FILES; do
       echo " - $FILE"
     done
-    
-    # Destination directory structure (where hermes files should be copied to)
+
+    # Destination directory structure (where hermes files should be replaced)
     HERMES_DEST_DIR="$(Build.SourcesDirectory)/ios/Pods/hermes-engine/destroot/Library/Frameworks/universal/hermes.xcframework"
     IOS_ARM64_DIR="$HERMES_DEST_DIR/ios-arm64"
-    
+
     # Check if pod install has completed and created the destination structure
     if [ ! -d "$HERMES_DEST_DIR" ]; then
-      echo "Creating destination directory structure..."
-      mkdir -p "$IOS_ARM64_DIR"
+      echo "Destination directory $HERMES_DEST_DIR doesn't exist after pod install."
+      echo "Pod installation may have failed or the hermes-engine structure is different."
+      exit 1
     fi
-    
-    # Check if we found ios-arm64 directories in destination
-    if [ -d "$HERMES_DEST_DIR" ]; then
-      # Find all ios-arm64* directories in destination
-      ARM64_DIRS=$(find "$HERMES_DEST_DIR" -type d -name "ios-arm64*" 2>/dev/null || echo "")
-      
-      if [ -n "$ARM64_DIRS" ]; then
-        echo "Found the following ios-arm64 directories to copy to:"
-        echo "$ARM64_DIRS"
+
+    # Find all ios-arm64* directories in destination
+    ARM64_DIRS=$(find "$HERMES_DEST_DIR" -type d -name "ios-arm64*" 2>/dev/null || echo "")
+
+    if [ -n "$ARM64_DIRS" ]; then
+      echo "Found the following ios-arm64 directories:"
+      echo "$ARM64_DIRS"
+
+      # Replace existing Hermes files in each arm64 directory
+      for DIR in $ARM64_DIRS; do
+        echo "Searching for existing Hermes files in $DIR..."
         
-        # Copy hermes files to each arm64 directory
-        for DIR in $ARM64_DIRS; do
-          echo "Copying hermes files to $DIR..."
+        # Find existing Hermes files in the destination directory
+        EXISTING_HERMES_FILES=$(find "$DIR" -name "*hermes*" -type f 2>/dev/null || echo "")
+        
+        if [ -n "$EXISTING_HERMES_FILES" ]; then
+          echo "Found the following existing Hermes files:"
+          for EXISTING_FILE in $EXISTING_HERMES_FILES; do
+            echo " - $EXISTING_FILE"
+          done
           
-          # Copy all relevant files
+          # Replace each existing Hermes file with the corresponding source file
           for FILE in $HERMES_SOURCE_FILES; do
             FILENAME=$(basename "$FILE")
-            echo "Copying $FILENAME to $DIR"
-            cp -f "$FILE" "$DIR/" || echo "Warning: Failed to copy $FILENAME"
+            TARGET_FILE=$(find "$DIR" -name "$FILENAME" -type f 2>/dev/null || echo "")
+            
+            if [ -n "$TARGET_FILE" ]; then
+              echo "Replacing $TARGET_FILE with $FILE..."
+              cp -f "$FILE" "$TARGET_FILE" || echo "Warning: Failed to replace $TARGET_FILE"
+            else
+              echo "No matching file found for $FILENAME in $DIR. Skipping replacement."
+            fi
           done
-        done
-        
-        echo "✅ Hermes files copied successfully!"
-      else
-        echo "No ios-arm64 directories found in $HERMES_DEST_DIR"
-        echo "Creating ios-arm64 directory and copying files..."
-        mkdir -p "$IOS_ARM64_DIR"
-        
-        for FILE in $HERMES_SOURCE_FILES; do
-          FILENAME=$(basename "$FILE")
-          echo "Copying $FILENAME to $IOS_ARM64_DIR"
-          cp -f "$FILE" "$IOS_ARM64_DIR/" || echo "Warning: Failed to copy $FILENAME"
-        done
-      fi
+          
+          echo "✅ Hermes files replaced successfully in $DIR!"
+        else
+          echo "No existing Hermes files found in $DIR. Skipping replacement."
+        fi
+      done
     else
-      echo "Destination directory $HERMES_DEST_DIR doesn't exist after pod install."
-      echo "This is unusual. Pod installation may have failed or the hermes-engine structure is different."
+      echo "No ios-arm64 directories found in $HERMES_DEST_DIR. Unable to proceed."
     fi
   displayName: 'Copy Hermes Files from AppSealingSDK'
   
