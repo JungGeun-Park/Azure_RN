@@ -105,47 +105,121 @@ steps:
     df -h /
   displayName: 'Clean Disk Space'
 
+# Node.js 설치
+- task: NodeTool@0
+  inputs:
+    versionSpec: '18.x'  # React Native와 호환되는 안정적인 버전 사용
+  displayName: 'Install Node.js'
+
+# Node 모듈 완전 재설치 (clean install)
 - script: |
-    # Ruby/Gems 환경 설정
+    echo "Removing existing node_modules..."
+    rm -rf node_modules
+    rm -f package-lock.json
+    
+    echo "Installing Node modules..."
+    npm install --legacy-peer-deps
+    
+    echo "Verifying react-native/scripts/react_native_pods.rb exists..."
+    if [ -f "node_modules/react-native/scripts/react_native_pods.rb" ]; then
+      echo "✅ react_native_pods.rb exists!"
+    else
+      echo "❌ react_native_pods.rb is missing!"
+      echo "Running npm audit fix to restore missing files..."
+      npm audit fix --force
+    fi
+  displayName: 'Reinstall Node Modules'
+
+# ffi 라이브러리 문제 해결
+- script: |
     export GEM_HOME=$HOME/.gem
     export PATH=$GEM_HOME/bin:$PATH
-
-    # 사용자 모드로 CocoaPods 설치
-    gem install cocoapods --user-install
-
-    # PATH 출력하여 확인
-    echo "Current PATH: $PATH"
     
-    # 설치된 CocoaPods 버전 확인
-    which pod || echo "pod not found in PATH"
-    
-    # .bashrc에 PATH 추가 (다음 명령을 위해)
-    echo 'export GEM_HOME=$HOME/.gem' >> ~/.bashrc
-    echo 'export PATH=$GEM_HOME/bin:$PATH' >> ~/.bashrc
-  displayName: 'Install CocoaPods'
-
-- script: |
-    # ffi 라이브러리 수정
-    export GEM_HOME=$HOME/.gem
-    export PATH=$GEM_HOME/bin:$PATH
-    
-    # ffi 복구 시도
+    echo "Restoring ffi gem..."
     gem pristine ffi --version 1.16.3 || echo "Failed to restore ffi, continuing anyway..."
   displayName: 'Fix Ruby FFI'
 
+# CocoaPods 설치 (사용자 모드)
 - script: |
     export GEM_HOME=$HOME/.gem
     export PATH=$GEM_HOME/bin:$PATH
     
+    echo "Installing CocoaPods..."
+    gem install cocoapods --user-install
+    
+    echo "CocoaPods version:"
+    export PATH=$HOME/.gem/ruby/*/bin:$PATH
+    which pod || echo "Pod not found in PATH"
+    pod --version || echo "Pod command not available"
+  displayName: 'Install CocoaPods'
+
+# Podfile 수정 (fallback 메커니즘 추가)
+- script: |
     cd ios
-    # Clear CocoaPods cache
-    rm -rf ~/Library/Caches/CocoaPods
-    # Force pod repo update
-    pod repo update --verbose
-    # Install with repo update
-    pod install --repo-update
-  displayName: 'Install Pod Dependencies with Update'
-  
+    
+    echo "Backing up original Podfile..."
+    cp Podfile Podfile.bak
+    
+    echo "Modifying Podfile to ensure compatibility..."
+    cat > Podfile << 'EOF'
+    # 직접 상대 경로로 참조 (fallback 메커니즘)
+    begin
+      require_relative '../node_modules/react-native/scripts/react_native_pods'
+      require_relative '../node_modules/@react-native-community/cli-platform-ios/native_modules'
+    rescue => e
+      # 기존 방식 시도 (fallback)
+      Pod::UI.warn "Failed to load with require_relative. Falling back to node resolve. Error: #{e.message}"
+      require Pod::Executable.execute_command('node', ['-e', 
+        'console.log(require.resolve("react-native/scripts/react_native_pods"));'
+      ]).strip
+    end
+
+    platform :ios, min_ios_version_supported
+    prepare_react_native_project!
+
+    # 원본 Podfile에서 이 부분 이후 내용 복사
+    linkage = ENV['USE_FRAMEWORKS']
+    if linkage != nil
+      Pod::UI.puts "Configuring Pod with #{linkage}ally linked Frameworks".green
+      use_frameworks! :linkage => linkage.to_sym
+    end
+
+    target '${APP_NAME}' do
+      config = use_native_modules!
+      use_react_native!(
+        :path => config[:reactNativePath],
+        # 앱 절대 경로
+        :app_path => "#{Pod::Config.instance.installation_root}/.."
+      )
+    end
+
+    post_install do |installer|
+      react_native_post_install(
+        installer,
+        config[:reactNativePath],
+        :mac_catalyst_enabled => false
+      )
+    end
+    EOF
+    
+    cd ..
+  displayName: 'Fix Podfile'
+
+# Pod 설치 (포드 캐시 정리 후)
+- script: |
+    export GEM_HOME=$HOME/.gem
+    export PATH=$HOME/.gem/ruby/*/bin:$PATH
+    
+    echo "Cache cleanup and Pod install..."
+    cd ios
+    rm -rf ~/Library/Caches/CocoaPods || true
+    rm -rf Pods Podfile.lock || true
+    pod deintegrate || true
+    pod setup
+    pod install --repo-update --verbose
+    cd ..
+  displayName: 'Install Pod Dependencies'
+    
 - script: |  # Bundle ID 추출 단계 추가
     INFO_PLIST_PATH="ios/${APP_NAME}/Info.plist"
     if [ -f "$INFO_PLIST_PATH" ]; then
