@@ -96,15 +96,23 @@ steps:
     fi
   displayName: 'Increment Build Number and Set Deployment Target'
 
+  # Node.js 설치
+- task: NodeTool@0
+  inputs:
+    versionSpec: '18.x'  # 사용 중인 Node.js 버전
+  displayName: 'Install Node.js'
+
+# 의존성 설치
 - script: |
-    # cd ios
-    # pod deintegrate
-    # cd ..
-    # npm install
+    npm install
+  displayName: 'Install Dependencies'
+
+# CocoaPods 설치
+- script: |
+    sudo gem install cocoapods
     cd ios
-    pod install --repo-update
-    cd ..
-  displayName: 'Install Pod Dependencies'
+    pod install
+  displayName: 'Install CocoaPods'
 
 - script: |  # Bundle ID 추출 단계 추가
     INFO_PLIST_PATH="ios/${APP_NAME}/Info.plist"
