@@ -294,7 +294,6 @@ steps:
 
     # Destination directory structure (where hermes files should be replaced)
     HERMES_DEST_DIR="$(Build.SourcesDirectory)/ios/Pods/hermes-engine/destroot/Library/Frameworks/universal/hermes.xcframework"
-    IOS_ARM64_DIR="$HERMES_DEST_DIR/ios-arm64"
 
     # Check if pod install has completed and created the destination structure
     if [ ! -d "$HERMES_DEST_DIR" ]; then
@@ -303,46 +302,33 @@ steps:
       exit 1
     fi
 
-    # Find all ios-arm64* directories in destination
-    ARM64_DIRS=$(find "$HERMES_DEST_DIR" -type d -name "ios-arm64*" 2>/dev/null || echo "")
+    # Find all existing Hermes files in the entire destination directory (recursively)
+    EXISTING_HERMES_FILES=$(find "$HERMES_DEST_DIR" -name "*hermes*" -type f 2>/dev/null || echo "")
 
-    if [ -n "$ARM64_DIRS" ]; then
-      echo "Found the following ios-arm64 directories:"
-      echo "$ARM64_DIRS"
-
-      # Replace existing Hermes files in each arm64 directory
-      for DIR in $ARM64_DIRS; do
-        echo "Searching for existing Hermes files in $DIR..."
+    if [ -n "$EXISTING_HERMES_FILES" ]; then
+      echo "Found the following existing Hermes files in $HERMES_DEST_DIR:"
+      for EXISTING_FILE in $EXISTING_HERMES_FILES; do
+        echo " - $EXISTING_FILE"
+      done
+      
+      # Replace each existing Hermes file with the corresponding source file
+      for FILE in $HERMES_SOURCE_FILES; do
+        FILENAME=$(basename "$FILE")
         
-        # Find existing Hermes files in the destination directory
-        EXISTING_HERMES_FILES=$(find "$DIR" -name "*hermes*" -type f 2>/dev/null || echo "")
+        # Find matching file by name in the destination directory
+        TARGET_FILE=$(echo "$EXISTING_HERMES_FILES" | grep "/$FILENAME$" || echo "")
         
-        if [ -n "$EXISTING_HERMES_FILES" ]; then
-          echo "Found the following existing Hermes files:"
-          for EXISTING_FILE in $EXISTING_HERMES_FILES; do
-            echo " - $EXISTING_FILE"
-          done
-          
-          # Replace each existing Hermes file with the corresponding source file
-          for FILE in $HERMES_SOURCE_FILES; do
-            FILENAME=$(basename "$FILE")
-            TARGET_FILE=$(find "$DIR" -name "$FILENAME" -type f 2>/dev/null || echo "")
-            
-            if [ -n "$TARGET_FILE" ]; then
-              echo "Replacing $TARGET_FILE with $FILE..."
-              cp -f "$FILE" "$TARGET_FILE" || echo "Warning: Failed to replace $TARGET_FILE"
-            else
-              echo "No matching file found for $FILENAME in $DIR. Skipping replacement."
-            fi
-          done
-          
-          echo "✅ Hermes files replaced successfully in $DIR!"
+        if [ -n "$TARGET_FILE" ]; then
+          echo "Replacing $TARGET_FILE with $FILE..."
+          cp -f "$FILE" "$TARGET_FILE" || echo "Warning: Failed to replace $TARGET_FILE"
         else
-          echo "No existing Hermes files found in $DIR. Skipping replacement."
+          echo "No matching file found for $FILENAME in $HERMES_DEST_DIR. Skipping replacement."
         fi
       done
+      
+      echo "✅ Hermes files replaced successfully!"
     else
-      echo "No ios-arm64 directories found in $HERMES_DEST_DIR. Unable to proceed."
+      echo "No existing Hermes files found in $HERMES_DEST_DIR. Unable to proceed."
     fi
   displayName: 'Copy Hermes Files from AppSealingSDK'
   
