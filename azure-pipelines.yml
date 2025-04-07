@@ -97,37 +97,78 @@ steps:
   displayName: 'Increment Build Number and Set Deployment Target'
 
 - script: |
-    # Backup Hermes files from the correct architecture-specific locations
-    echo "Backing up Hermes files from architecture-specific locations..."
+    # Enhanced backup script for Hermes iOS arm64 files with detailed logging
+    echo "Starting Hermes files backup process..."
     
     # Define backup directory
     HERMES_BACKUP_DIR="$(Build.SourcesDirectory)/hermes_backup"
     mkdir -p "$HERMES_BACKUP_DIR"
     
-    # Define the base path for hermes.xcframework
-    HERMES_XCFRAMEWORK_PATH="$(Build.SourcesDirectory)/ios/Pods/hermes-engine/destroot/Library/Frameworks/universal/hermes.xcframework"
+    # Define all possible paths where hermes.xcframework might be located
+    POSSIBLE_PATHS=(
+      "$(Build.SourcesDirectory)/ios/Pods/hermes-engine/destroot/Library/Frameworks/universal/hermes.xcframework"
+      "$(Build.SourcesDirectory)/ios/Pods/hermes-engine/destroot/Library/Frameworks/iphoneos/hermes.framework"
+      "$(Build.SourcesDirectory)/ios/Pods/hermes-engine/destroot/Library/Frameworks/hermes.xcframework"
+    )
     
-    # Check if hermes.xcframework exists
-    if [ -d "$HERMES_XCFRAMEWORK_PATH" ]; then
+    echo "Checking for hermes.xcframework in possible locations..."
+    FOUND_HERMES=false
+    
+    for POSSIBLE_PATH in "${POSSIBLE_PATHS[@]}"; do
+      echo "Checking path: $POSSIBLE_PATH"
+      if [ -d "$POSSIBLE_PATH" ]; then
+        echo "✅ Found Hermes at: $POSSIBLE_PATH"
+        HERMES_XCFRAMEWORK_PATH="$POSSIBLE_PATH"
+        FOUND_HERMES=true
+        break
+      else
+        echo "❌ Not found at: $POSSIBLE_PATH"
+      fi
+    done
+    
+    if [ "$FOUND_HERMES" = true ]; then
       echo "Found hermes.xcframework at: $HERMES_XCFRAMEWORK_PATH"
       
       # Find and backup all ios-arm64* directories
-      for ARCH_DIR in $(find "$HERMES_XCFRAMEWORK_PATH" -type d -name "ios-arm64*"); do
-        DIR_NAME=$(basename "$ARCH_DIR")
-        echo "Backing up architecture directory: $DIR_NAME"
+      ARM64_DIRS=$(find "$HERMES_XCFRAMEWORK_PATH" -type d -name "ios-arm64*" 2>/dev/null || echo "")
+      
+      if [ -n "$ARM64_DIRS" ]; then
+        echo "Found the following ios-arm64 directories to backup:"
+        echo "$ARM64_DIRS"
         
-        # Create backup directory for this architecture
-        mkdir -p "$HERMES_BACKUP_DIR/$DIR_NAME"
+        for ARCH_DIR in $ARM64_DIRS; do
+          DIR_NAME=$(basename "$ARCH_DIR")
+          echo "Backing up architecture directory: $DIR_NAME"
+          
+          # Create backup directory for this architecture
+          mkdir -p "$HERMES_BACKUP_DIR/$DIR_NAME"
+          
+          # Copy all contents from this architecture directory
+          cp -R "$ARCH_DIR"/* "$HERMES_BACKUP_DIR/$DIR_NAME/" || echo "Warning: Some files could not be copied from $ARCH_DIR"
+          echo "✅ Backed up $DIR_NAME"
+        done
         
-        # Copy all contents from this architecture directory
-        cp -R "$ARCH_DIR"/* "$HERMES_BACKUP_DIR/$DIR_NAME/"
-        echo "✅ Backed up $DIR_NAME"
-      done
+        # Create a marker file to indicate successful backup
+        echo "$(date)" > "$HERMES_BACKUP_DIR/backup_completed"
+        echo "Hermes backup completed successfully!"
+      else
+        echo "No ios-arm64 directories found in $HERMES_XCFRAMEWORK_PATH"
+        ls -la "$HERMES_XCFRAMEWORK_PATH" || echo "Cannot list directory contents"
+        find "$HERMES_XCFRAMEWORK_PATH" -type d -name "*" | grep -i arm || echo "No arm-related directories found"
+      fi
     else
-      echo "hermes.xcframework not found at expected location. First-time build?"
+      echo "hermes.xcframework not found at any expected location. First-time build?"
+      echo "This is normal for first builds. Will continue without backup."
+      echo "Will create a new Hermes during pod install."
+      
+      # Create a marker file to indicate we're on first build
+      echo "$(date)" > "$HERMES_BACKUP_DIR/first_build"
     fi
-  displayName: 'Backup Hermes Files'
-
+    
+    # Don't fail the build if we couldn't backup - this is expected on first run
+    exit 0
+  displayName: 'Backup Hermes Files with Enhanced Logging'
+  
 - task: NodeTool@0
   inputs:
     versionSpec: '18.x'  # React Native와 호환되는 안정적인 버전 사용
@@ -390,7 +431,7 @@ steps:
     
     echo "Hermes restore completed!"
   displayName: 'Restore Hermes Files'
-  
+
 - script: |
     EXPORT_DIR="$(Build.ArtifactStagingDirectory)"
     ARCHIVE_PATH="$EXPORT_DIR/${APP_NAME}.xcarchive"
