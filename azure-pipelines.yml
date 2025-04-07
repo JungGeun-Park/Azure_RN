@@ -97,47 +97,10 @@ steps:
   displayName: 'Increment Build Number and Set Deployment Target'
 
 - script: |
-    echo "Cleaning up disk space..."
-    df -h
-    rm -rf ~/Library/Caches/*
-    rm -rf /tmp/*
-    echo "Disk space after cleanup:"
-    df -h
-  displayName: 'Clean Up Disk Space'
-
-- script: |
-    echo "Checking disk space..."
-    df -h /
-    USED_SPACE=$(df / | tail -1 | awk '{print $5}' | sed 's/%//')
-    
-    if [ "$USED_SPACE" -gt 90 ]; then
-        echo "##vso[task.logissue type=warning] Disk space usage is above 90%. Please clean up disk space."
-        exit 1
-    fi
-  displayName: 'Check Disk Space'
-
-- script: |
-    echo "Uninstalling existing CocoaPods..."
-    brew list cocoapods && brew uninstall cocoapods --force || echo "CocoaPods not installed."
-    
-    echo "Installing CocoaPods..."
-    sudo gem install cocoapods -n /usr/local/bin
-    
-    echo "Verifying CocoaPods installation..."
-    pod --version
-  displayName: 'Reinstall CocoaPods'
-
-- script: |
-    gem install bundler
-    bundle install
-    gem pristine ffi --version 1.16.3
-  displayName: 'Fix Ruby Gems'
-
-- script: |
-    cd ios
-    pod deintegrate
-    cd ..
-    npm install
+    # cd ios
+    # pod deintegrate
+    # cd ..
+    # npm install
     cd ios
     pod install --repo-update
     cd ..
