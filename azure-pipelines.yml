@@ -96,7 +96,7 @@ steps:
     fi
   displayName: 'Increment Build Number and Set Deployment Target'
 
-  - script: |
+- script: |
     echo "Cleaning up disk space..."
     df -h
     rm -rf ~/Library/Caches/*
@@ -105,7 +105,7 @@ steps:
     df -h
   displayName: 'Clean Up Disk Space'
 
-  - script: |
+- script: |
     echo "Checking disk space..."
     df -h /
     USED_SPACE=$(df / | tail -1 | awk '{print $5}' | sed 's/%//')
@@ -116,7 +116,7 @@ steps:
     fi
   displayName: 'Check Disk Space'
 
-  - script: |
+- script: |
     echo "Uninstalling existing CocoaPods..."
     brew list cocoapods && brew uninstall cocoapods --force || echo "CocoaPods not installed."
     
