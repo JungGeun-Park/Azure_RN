@@ -134,17 +134,18 @@ steps:
   displayName: 'Fix Ruby FFI'
 
 - script: |
-    # 환경 변수 설정
     export GEM_HOME=$HOME/.gem
     export PATH=$GEM_HOME/bin:$PATH
     
-    # iOS 디렉토리로 이동
     cd ios
-    
-    # pod 설치 실행
+    # Clear CocoaPods cache
+    rm -rf ~/Library/Caches/CocoaPods
+    # Force pod repo update
+    pod repo update --verbose
+    # Install with repo update
     pod install --repo-update
-  displayName: 'Install Pod Dependencies'
-
+  displayName: 'Install Pod Dependencies with Update'
+  
 - script: |  # Bundle ID 추출 단계 추가
     INFO_PLIST_PATH="ios/${APP_NAME}/Info.plist"
     if [ -f "$INFO_PLIST_PATH" ]; then
