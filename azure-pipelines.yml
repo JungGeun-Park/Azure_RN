@@ -305,15 +305,18 @@ steps:
     # 2. 아카이브 빌드
     cd ios
     xcodebuild clean archive \
-      -workspace "${APP_NAME}.xcworkspace" \
-      -scheme "${APP_NAME}" \
-      -sdk iphoneos \
-      -configuration Release \
-      CODE_SIGN_IDENTITY="Apple Distribution" \
-      DEVELOPMENT_TEAM="${{ parameters.TEAM_ID }}" \
-      PROVISIONING_PROFILE_SPECIFIER="${{ parameters.PROVISIONING_PROFILE_NAME }}" \
-      SWIFT_OBJC_BRIDGING_HEADER="Azure_RN078-Bridging-Header.h" \
-      -archivePath "$(Build.ArtifactStagingDirectory)/${APP_NAME}.xcarchive"
+          -workspace "${APP_NAME}.xcworkspace" \
+          -scheme "${APP_NAME}" \
+          -sdk iphoneos \
+          -configuration Release \
+          clean archive \
+          CODE_SIGN_IDENTITY="Apple Distribution" \
+          CODE_SIGN_STYLE="Manual" \
+          CODE_SIGN_IDENTITY="Apple Distribution" \
+          DEVELOPMENT_TEAM="${{ parameters.TEAM_ID }}" \
+          PROVISIONING_PROFILE_SPECIFIER="${{ parameters.PROVISIONING_PROFILE_NAME }}" \
+          SWIFT_OBJC_BRIDGING_HEADER="Azure_RN078-Bridging-Header.h" \
+          -archivePath "$(Build.ArtifactStagingDirectory)/${APP_NAME}.xcarchive"
 
     # 3. IPA 내보내기
     xcodebuild -exportArchive \
