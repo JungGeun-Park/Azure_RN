@@ -270,7 +270,10 @@ steps:
     </dict>
     </plist>
     EOF
-  
+    
+    echo "ExportOptions.plist created with provisioningProfiles and bundle ID."
+    cat "$EXPORT_DIR/ExportOptions.plist"  # Output the created plist content for debugging
+
   displayName: 'Generate ExportOptions.plist'
 
 - script: |
