@@ -9,6 +9,8 @@
 /* Begin PBXBuildFile section */
 		0C80B921A6F3F58F76C31292 /* libPods-Azure_RN078.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 5DCACB8F33CDC322A6C60F78 /* libPods-Azure_RN078.a */; };
 		13B07FBF1A68108700A75B9A /* Images.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 13B07FB51A68108700A75B9A /* Images.xcassets */; };
+		25869E8A2DA3AA910097A243 /* AppSealingiOS.mm in Sources */ = {isa = PBXBuildFile; fileRef = 25869E892DA3AA910097A243 /* AppSealingiOS.mm */; };
+		25869E8B2DA3AA910097A243 /* appsealing.lic in Resources */ = {isa = PBXBuildFile; fileRef = 25869E872DA3AA910097A243 /* appsealing.lic */; };
 		59D561D398CB18F5D3E34135 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 13B07FB81A68108700A75B9A /* PrivacyInfo.xcprivacy */; };
 		761780ED2CA45674006654EE /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 761780EC2CA45674006654EE /* AppDelegate.swift */; };
 		81AB9BB82411601600AC10FF /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 81AB9BB72411601600AC10FF /* LaunchScreen.storyboard */; };
@@ -19,6 +21,10 @@
 		13B07FB51A68108700A75B9A /* Images.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; name = Images.xcassets; path = Azure_RN078/Images.xcassets; sourceTree = "<group>"; };
 		13B07FB61A68108700A75B9A /* Info.plist */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; name = Info.plist; path = Azure_RN078/Info.plist; sourceTree = "<group>"; };
 		13B07FB81A68108700A75B9A /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; name = PrivacyInfo.xcprivacy; path = Azure_RN078/PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
+		25869E872DA3AA910097A243 /* appsealing.lic */ = {isa = PBXFileReference; lastKnownFileType = file; name = appsealing.lic; path = AppSealingSDK/appsealing.lic; sourceTree = "<group>"; };
+		25869E882DA3AA910097A243 /* AppSealingiOS.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = AppSealingiOS.h; path = AppSealingSDK/AppSealingiOS.h; sourceTree = "<group>"; };
+		25869E892DA3AA910097A243 /* AppSealingiOS.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; name = AppSealingiOS.mm; path = AppSealingSDK/AppSealingiOS.mm; sourceTree = "<group>"; };
+		25869E8C2DA3AA930097A243 /* Azure_RN078-Bridging-Header.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "Azure_RN078-Bridging-Header.h"; sourceTree = "<group>"; };
 		3B4392A12AC88292D35C810B /* Pods-Azure_RN078.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-Azure_RN078.debug.xcconfig"; path = "Target Support Files/Pods-Azure_RN078/Pods-Azure_RN078.debug.xcconfig"; sourceTree = "<group>"; };
 		5709B34CF0A7D63546082F79 /* Pods-Azure_RN078.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-Azure_RN078.release.xcconfig"; path = "Target Support Files/Pods-Azure_RN078/Pods-Azure_RN078.release.xcconfig"; sourceTree = "<group>"; };
 		5DCACB8F33CDC322A6C60F78 /* libPods-Azure_RN078.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; includeInIndex = 0; path = "libPods-Azure_RN078.a"; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -42,11 +48,15 @@
 		13B07FAE1A68108700A75B9A /* Azure_RN078 */ = {
 			isa = PBXGroup;
 			children = (
+				25869E872DA3AA910097A243 /* appsealing.lic */,
+				25869E882DA3AA910097A243 /* AppSealingiOS.h */,
+				25869E892DA3AA910097A243 /* AppSealingiOS.mm */,
 				13B07FB51A68108700A75B9A /* Images.xcassets */,
 				761780EC2CA45674006654EE /* AppDelegate.swift */,
 				13B07FB61A68108700A75B9A /* Info.plist */,
 				81AB9BB72411601600AC10FF /* LaunchScreen.storyboard */,
 				13B07FB81A68108700A75B9A /* PrivacyInfo.xcprivacy */,
+				25869E8C2DA3AA930097A243 /* Azure_RN078-Bridging-Header.h */,
 			);
 			name = Azure_RN078;
 			sourceTree = "<group>";
@@ -131,7 +141,7 @@
 				LastUpgradeCheck = 1210;
 				TargetAttributes = {
 					13B07F861A680F5B00A75B9A = {
-						LastSwiftMigration = 1120;
+						LastSwiftMigration = 1610;
 					};
 				};
 			};
@@ -158,6 +168,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				25869E8B2DA3AA910097A243 /* appsealing.lic in Resources */,
 				81AB9BB82411601600AC10FF /* LaunchScreen.storyboard in Resources */,
 				13B07FBF1A68108700A75B9A /* Images.xcassets in Resources */,
 				59D561D398CB18F5D3E34135 /* PrivacyInfo.xcprivacy in Resources */,
@@ -247,6 +258,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				761780ED2CA45674006654EE /* AppDelegate.swift in Sources */,
+				25869E8A2DA3AA910097A243 /* AppSealingiOS.mm in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -281,6 +293,7 @@
 				PRODUCT_NAME = Azure_RN078;
 				PROVISIONING_PROFILE_SPECIFIER = "";
 				"PROVISIONING_PROFILE_SPECIFIER[sdk=iphoneos*]" = "AppSealing Wildcard Distribution Profile";
+				SWIFT_OBJC_BRIDGING_HEADER = "Azure_RN078-Bridging-Header.h";
 				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
 				SWIFT_VERSION = 5.0;
 				VERSIONING_SYSTEM = "apple-generic";
@@ -314,6 +327,7 @@
 				PRODUCT_NAME = Azure_RN078;
 				PROVISIONING_PROFILE_SPECIFIER = "";
 				"PROVISIONING_PROFILE_SPECIFIER[sdk=iphoneos*]" = "AppSealing Wildcard Distribution Profile";
+				SWIFT_OBJC_BRIDGING_HEADER = "Azure_RN078-Bridging-Header.h";
 				SWIFT_VERSION = 5.0;
 				VERSIONING_SYSTEM = "apple-generic";
 			};
