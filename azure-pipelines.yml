@@ -129,14 +129,14 @@ steps:
     fi
   displayName: 'Reinstall Node Modules'
 
-# ffi 라이브러리 문제 해결
-- script: |
-    export GEM_HOME=$HOME/.gem
-    export PATH=$GEM_HOME/bin:$PATH
+# # ffi 라이브러리 문제 해결
+# - script: |
+#     export GEM_HOME=$HOME/.gem
+#     export PATH=$GEM_HOME/bin:$PATH
     
-    echo "Restoring ffi gem..."
-    gem pristine ffi --version 1.16.3 || echo "Failed to restore ffi, continuing anyway..."
-  displayName: 'Fix Ruby FFI'
+#     echo "Restoring ffi gem..."
+#     gem pristine ffi --version 1.16.3 || echo "Failed to restore ffi, continuing anyway..."
+#   displayName: 'Fix Ruby FFI'
 
 # CocoaPods 설치 (사용자 모드)
 - script: |
@@ -152,57 +152,57 @@ steps:
     pod --version || echo "Pod command not available"
   displayName: 'Install CocoaPods'
 
-# Podfile 수정 (fallback 메커니즘 추가)
-- script: |
-    cd ios
+# # Podfile 수정 (fallback 메커니즘 추가)
+# - script: |
+#     cd ios
     
-    echo "Backing up original Podfile..."
-    cp Podfile Podfile.bak
+#     echo "Backing up original Podfile..."
+#     cp Podfile Podfile.bak
     
-    echo "Modifying Podfile to ensure compatibility..."
-    cat > Podfile << 'EOF'
-    # 직접 상대 경로로 참조 (fallback 메커니즘)
-    begin
-      require_relative '../node_modules/react-native/scripts/react_native_pods'
-      require_relative '../node_modules/@react-native-community/cli-platform-ios/native_modules'
-    rescue => e
-      # 기존 방식 시도 (fallback)
-      Pod::UI.warn "Failed to load with require_relative. Falling back to node resolve. Error: #{e.message}"
-      require Pod::Executable.execute_command('node', ['-e', 
-        'console.log(require.resolve("react-native/scripts/react_native_pods"));'
-      ]).strip
-    end
+#     echo "Modifying Podfile to ensure compatibility..."
+#     cat > Podfile << 'EOF'
+#     # 직접 상대 경로로 참조 (fallback 메커니즘)
+#     begin
+#       require_relative '../node_modules/react-native/scripts/react_native_pods'
+#       require_relative '../node_modules/@react-native-community/cli-platform-ios/native_modules'
+#     rescue => e
+#       # 기존 방식 시도 (fallback)
+#       Pod::UI.warn "Failed to load with require_relative. Falling back to node resolve. Error: #{e.message}"
+#       require Pod::Executable.execute_command('node', ['-e', 
+#         'console.log(require.resolve("react-native/scripts/react_native_pods"));'
+#       ]).strip
+#     end
 
-    platform :ios, min_ios_version_supported
-    prepare_react_native_project!
+#     platform :ios, min_ios_version_supported
+#     prepare_react_native_project!
 
-    # 원본 Podfile에서 이 부분 이후 내용 복사
-    linkage = ENV['USE_FRAMEWORKS']
-    if linkage != nil
-      Pod::UI.puts "Configuring Pod with #{linkage}ally linked Frameworks".green
-      use_frameworks! :linkage => linkage.to_sym
-    end
+#     # 원본 Podfile에서 이 부분 이후 내용 복사
+#     linkage = ENV['USE_FRAMEWORKS']
+#     if linkage != nil
+#       Pod::UI.puts "Configuring Pod with #{linkage}ally linked Frameworks".green
+#       use_frameworks! :linkage => linkage.to_sym
+#     end
 
-    target '${APP_NAME}' do
-      config = use_native_modules!
-      use_react_native!(
-        :path => config[:reactNativePath],
-        # 앱 절대 경로
-        :app_path => "#{Pod::Config.instance.installation_root}/.."
-      )
-    end
+#     target '${APP_NAME}' do
+#       config = use_native_modules!
+#       use_react_native!(
+#         :path => config[:reactNativePath],
+#         # 앱 절대 경로
+#         :app_path => "#{Pod::Config.instance.installation_root}/.."
+#       )
+#     end
 
-    post_install do |installer|
-      react_native_post_install(
-        installer,
-        config[:reactNativePath],
-        :mac_catalyst_enabled => false
-      )
-    end
-    EOF
+#     post_install do |installer|
+#       react_native_post_install(
+#         installer,
+#         config[:reactNativePath],
+#         :mac_catalyst_enabled => false
+#       )
+#     end
+#     EOF
     
-    cd ..
-  displayName: 'Fix Podfile'
+#     cd ..
+#   displayName: 'Fix Podfile'
 
 # Pod 설치 (포드 캐시 정리 후)
 - script: |
@@ -419,6 +419,19 @@ steps:
     
     echo "IPA exported to: $EXPORT_DIR"
   displayName: 'Build and Export IPA'
+
+- script: |
+    # Grant execution permission to generate_hash script
+    HASH_SCRIPT_PATH="$(Build.SourcesDirectory)/ios/AppSealingSDK/Tools/generate_hash"
+    EXPORT_DIR="$(Build.ArtifactStagingDirectory)"
+    IPA_PATH=$(find "$EXPORT_DIR" -type f -name "*.ipa" | head -n 1)
+
+    echo "Granting execution permission to generate_hash..."
+    chmod +x "$HASH_SCRIPT_PATH"
+
+    echo "Running generate_hash with IPA..."
+    "$HASH_SCRIPT_PATH" "$IPA_PATH"
+  displayName: 'Run generate_hash on IPA'
 
 - script: |
     # Upload the IPA file to TestFlight using altool
