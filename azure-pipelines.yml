@@ -237,7 +237,7 @@ steps:
     export PATH=$GEM_HOME/ruby/2.6.0/bin:$PATH
     pod install --repo-update
   displayName: 'Fix Podfile and Install Pods'
-      
+
 - script: |  # Bundle ID 추출 단계 추가
     INFO_PLIST_PATH="ios/${APP_NAME}/Info.plist"
     if [ -f "$INFO_PLIST_PATH" ]; then
@@ -303,6 +303,7 @@ steps:
     fi
 
     # 2. 아카이브 빌드
+    cd ios
     xcodebuild clean archive \
       -workspace "${APP_NAME}.xcworkspace" \
       -scheme "${APP_NAME}" \
