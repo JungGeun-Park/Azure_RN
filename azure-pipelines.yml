@@ -96,23 +96,54 @@ steps:
     fi
   displayName: 'Increment Build Number and Set Deployment Target'
 
-  # Node.js 설치
-- task: NodeTool@0
-  inputs:
-    versionSpec: '18.x'  # 사용 중인 Node.js 버전
-  displayName: 'Install Node.js'
-
-# 의존성 설치
 - script: |
-    npm install
-  displayName: 'Install Dependencies'
+    # 디스크 공간 정리
+    echo "Cleaning up disk space..."
+    rm -rf ~/Library/Caches/* || true
+    rm -rf ~/Library/Developer/Xcode/DerivedData/* || true
+    rm -rf ~/Library/Developer/Xcode/iOS\ DeviceSupport/* || true
+    df -h /
+  displayName: 'Clean Disk Space'
 
-# CocoaPods 설치
 - script: |
+    # Ruby/Gems 환경 설정
+    export GEM_HOME=$HOME/.gem
+    export PATH=$GEM_HOME/bin:$PATH
+
+    # 사용자 모드로 CocoaPods 설치
     gem install cocoapods --user-install
-    export PATH=$HOME/.gem/ruby/$(ls $HOME/.gem/ruby)/bin:$PATH
-    cd ios && pod install && cd ..    
+
+    # PATH 출력하여 확인
+    echo "Current PATH: $PATH"
+    
+    # 설치된 CocoaPods 버전 확인
+    which pod || echo "pod not found in PATH"
+    
+    # .bashrc에 PATH 추가 (다음 명령을 위해)
+    echo 'export GEM_HOME=$HOME/.gem' >> ~/.bashrc
+    echo 'export PATH=$GEM_HOME/bin:$PATH' >> ~/.bashrc
   displayName: 'Install CocoaPods'
+
+- script: |
+    # ffi 라이브러리 수정
+    export GEM_HOME=$HOME/.gem
+    export PATH=$GEM_HOME/bin:$PATH
+    
+    # ffi 복구 시도
+    gem pristine ffi --version 1.16.3 || echo "Failed to restore ffi, continuing anyway..."
+  displayName: 'Fix Ruby FFI'
+
+- script: |
+    # 환경 변수 설정
+    export GEM_HOME=$HOME/.gem
+    export PATH=$GEM_HOME/bin:$PATH
+    
+    # iOS 디렉토리로 이동
+    cd ios
+    
+    # pod 설치 실행
+    pod install --repo-update
+  displayName: 'Install Pod Dependencies'
 
 - script: |  # Bundle ID 추출 단계 추가
     INFO_PLIST_PATH="ios/${APP_NAME}/Info.plist"
