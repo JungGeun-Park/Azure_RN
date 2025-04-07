@@ -239,14 +239,47 @@ steps:
   displayName: 'Fix Podfile and Install Pods'
 
 - script: |  # Bundle ID 추출 단계 추가
-    INFO_PLIST_PATH="ios/${APP_NAME}/Info.plist"
+    INFO_PLIST_PATH="$(Build.SourcesDirectory)/ios/Runner/Info.plist"
+
+    # 1. Info.plist에서 직접 추출 시도
     if [ -f "$INFO_PLIST_PATH" ]; then
-        BUNDLE_ID=$(/usr/libexec/PlistBuddy -c "Print :CFBundleIdentifier" "$INFO_PLIST_PATH")
-        echo "##vso[task.setvariable variable=BUNDLE_ID]$BUNDLE_ID"
+        echo "Info.plist에서 CFBundleIdentifier 추색 중..."
+        BUNDLE_ID=$(/usr/libexec/PlistBuddy -c "Print :CFBundleIdentifier" "$INFO_PLIST_PATH" 2>/dev/null)
+        
+        # 변수 미확인 시 Xcode 빌드 설정에서 추출
+        if [[ "$BUNDLE_ID" == *"$"* ]]; then
+            echo "변수 감지. Xcode 빌드 설정에서 PRODUCT_BUNDLE_IDENTIFIER 검색..."
+            BUNDLE_ID=$(xcodebuild -showBuildSettings \
+                        -project "$(Build.SourcesDirectory)/ios/Runner.xcodeproj" \
+                        -scheme Runner \
+                        -configuration Release \
+                        -sdk iphoneos |
+                        grep -E '^\s*PRODUCT_BUNDLE_IDENTIFIER\s*=' |
+                        awk -F '=' '{print $2}' |
+                        sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')
+        fi
     else
-        echo "##vso[task.logissue type=error] Info.plist not found!"
+        # 2. Info.plist 없을 경우 Xcode 빌드 설정에서 직접 추출
+        echo "Info.plist 없음. Xcode 빌드 설정에서 추출..."
+        BUNDLE_ID=$(xcodebuild -showBuildSettings \
+                    -project "$(Build.SourcesDirectory)/ios/Runner.xcodeproj" \
+                    -scheme Runner \
+                    -configuration Release \
+                    -sdk iphoneos |
+                    grep -E '^\s*PRODUCT_BUNDLE_IDENTIFIER\s*=' |
+                    awk -F '=' '{print $2}' |
+                    sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')
+    fi
+
+    # 최종 검증
+    if [ -z "$BUNDLE_ID" ]; then
+        echo "##vso[task.logissue type=error] Bundle identifier not found!"
         exit 1
     fi
+
+    echo "Final BUNDLE_ID: $BUNDLE_ID"
+    echo "##vso[task.setvariable variable=BUNDLE_ID]$BUNDLE_ID"
+    echo "##vso[task.logissue type=warning] Extracted Bundle ID: $BUNDLE_ID"
   displayName: 'Extract Bundle ID'
 
 - script: |  # ExportOptions.plist 생성 단계 수정
