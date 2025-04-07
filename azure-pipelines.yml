@@ -349,15 +349,17 @@ steps:
 - script: |
     # Grant execution permission to generate_hash script
     HASH_SCRIPT_PATH="$(Build.SourcesDirectory)/ios/AppSealingSDK/generate_hash"
+    echo "-------------------------------------"
     cd "$(Build.SourcesDirectory)/ios"
     ls -al
+    echo "-------------------------------------"
     EXPORT_DIR="$(Build.ArtifactStagingDirectory)"
     IPA_PATH=$(find "$EXPORT_DIR" -type f -name "*.ipa" | head -n 1)
 
     echo "Granting execution permission to generate_hash..."
     chmod +x "$HASH_SCRIPT_PATH"
 
-    echo "Running generate_hash with IPA..."
+    echo "Running generate_hash with IPA... $IPA_PATH"
     "$HASH_SCRIPT_PATH" "$IPA_PATH"
   displayName: 'Run generate_hash on IPA'
 
