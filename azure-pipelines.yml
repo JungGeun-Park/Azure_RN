@@ -310,8 +310,8 @@ steps:
       -sdk iphoneos \
       -configuration Release \
       CODE_SIGN_IDENTITY="Apple Distribution" \
-      DEVELOPMENT_TEAM="$TEAM_ID" \
-      PROVISIONING_PROFILE_SPECIFIER="$PROVISIONING_PROFILE_NAME" \
+      DEVELOPMENT_TEAM="${{ parameters.TEAM_ID }}" \
+      PROVISIONING_PROFILE_SPECIFIER="${{ parameters.PROVISIONING_PROFILE_NAME }}" \
       SWIFT_OBJC_BRIDGING_HEADER="Azure_RN078-Bridging-Header.h" \
       -archivePath "$(Build.ArtifactStagingDirectory)/${APP_NAME}.xcarchive"
 
