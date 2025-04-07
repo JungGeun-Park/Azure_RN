@@ -96,6 +96,38 @@ steps:
     fi
   displayName: 'Increment Build Number and Set Deployment Target'
 
+- script: |
+    # Backup Hermes files from the correct architecture-specific locations
+    echo "Backing up Hermes files from architecture-specific locations..."
+    
+    # Define backup directory
+    HERMES_BACKUP_DIR="$(Build.SourcesDirectory)/hermes_backup"
+    mkdir -p "$HERMES_BACKUP_DIR"
+    
+    # Define the base path for hermes.xcframework
+    HERMES_XCFRAMEWORK_PATH="$(Build.SourcesDirectory)/ios/Pods/hermes-engine/destroot/Library/Frameworks/universal/hermes.xcframework"
+    
+    # Check if hermes.xcframework exists
+    if [ -d "$HERMES_XCFRAMEWORK_PATH" ]; then
+      echo "Found hermes.xcframework at: $HERMES_XCFRAMEWORK_PATH"
+      
+      # Find and backup all ios-arm64* directories
+      for ARCH_DIR in $(find "$HERMES_XCFRAMEWORK_PATH" -type d -name "ios-arm64*"); do
+        DIR_NAME=$(basename "$ARCH_DIR")
+        echo "Backing up architecture directory: $DIR_NAME"
+        
+        # Create backup directory for this architecture
+        mkdir -p "$HERMES_BACKUP_DIR/$DIR_NAME"
+        
+        # Copy all contents from this architecture directory
+        cp -R "$ARCH_DIR"/* "$HERMES_BACKUP_DIR/$DIR_NAME/"
+        echo "✅ Backed up $DIR_NAME"
+      done
+    else
+      echo "hermes.xcframework not found at expected location. First-time build?"
+    fi
+  displayName: 'Backup Hermes Files'
+
 - task: NodeTool@0
   inputs:
     versionSpec: '18.x'  # React Native와 호환되는 안정적인 버전 사용
@@ -310,6 +342,55 @@ steps:
     cd ..
   displayName: 'Setup Bridging Header with sed'
 
+- script: |
+    # Restore backed-up Hermes files to their exact locations
+    echo "Restoring backed-up Hermes files to architecture-specific locations..."
+
+    HERMES_BACKUP_DIR="$(Build.SourcesDirectory)/hermes_backup"
+    HERMES_XCFRAMEWORK_PATH="$(Build.SourcesDirectory)/ios/Pods/hermes-engine/destroot/Library/Frameworks/universal/hermes.xcframework"
+    
+    # Check if backup directory exists
+    if [ ! -d "$HERMES_BACKUP_DIR" ]; then
+      echo "No Hermes backup found. Skipping restore."
+      exit 0
+    fi
+    
+    # Check if destination hermes.xcframework exists after pod install
+    if [ ! -d "$HERMES_XCFRAMEWORK_PATH" ]; then
+      echo "Error: hermes.xcframework not found after pod install!"
+      exit 1
+    fi
+    
+    # Restore each architecture-specific directory
+    for ARCH_DIR in "$HERMES_BACKUP_DIR"/*; do
+      if [ -d "$ARCH_DIR" ]; then
+        DIR_NAME=$(basename "$ARCH_DIR")
+        DEST_DIR="$HERMES_XCFRAMEWORK_PATH/$DIR_NAME"
+        
+        echo "Restoring architecture: $DIR_NAME to $DEST_DIR"
+        
+        # Ensure destination directory exists
+        if [ -d "$DEST_DIR" ]; then
+          # Backup any dSYM files if they exist in the new installation
+          if [ -d "$DEST_DIR/dSYMs" ]; then
+            mkdir -p "$ARCH_DIR/dSYMs"
+            cp -R "$DEST_DIR/dSYMs"/* "$ARCH_DIR/dSYMs/"
+            echo "Preserved dSYMs from new installation"
+          fi
+          
+          # Remove destination and replace with backup
+          rm -rf "$DEST_DIR"/*
+          cp -R "$ARCH_DIR"/* "$DEST_DIR/"
+          echo "✅ Restored $DIR_NAME"
+        else
+          echo "⚠️ Destination directory $DEST_DIR does not exist. Cannot restore."
+        fi
+      fi
+    done
+    
+    echo "Hermes restore completed!"
+  displayName: 'Restore Hermes Files'
+  
 - script: |
     EXPORT_DIR="$(Build.ArtifactStagingDirectory)"
     ARCHIVE_PATH="$EXPORT_DIR/${APP_NAME}.xcarchive"
