@@ -1,5 +1,5 @@
 trigger:
-- develop
+- main
 
 pool:
   name: APPSEALING
@@ -109,9 +109,9 @@ steps:
 
 # CocoaPods 설치
 - script: |
-    sudo gem install cocoapods
-    cd ios
-    pod install
+    gem install cocoapods --user-install
+    export PATH=$HOME/.gem/ruby/$(ls $HOME/.gem/ruby)/bin:$PATH
+    cd ios && pod install && cd ..    
   displayName: 'Install CocoaPods'
 
 - script: |  # Bundle ID 추출 단계 추가
