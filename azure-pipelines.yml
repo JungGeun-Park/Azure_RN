@@ -64,111 +64,6 @@ steps:
     security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
   displayName: 'Setup Temporary Keychain and Install Certificate'
 
-- script: |
-    # Increment build number for iOS (Info.plist)
-    INFO_PLIST_PATH="ios/${APP_NAME}/Info.plist"
-
-    if [ -f "$INFO_PLIST_PATH" ]; then
-        # 1. 변수 확장 문제 해결
-        CURRENT_BUILD_NUMBER=$(/usr/libexec/PlistBuddy -c "Print :CFBundleVersion" "$INFO_PLIST_PATH" 2>/dev/null || echo "1")
-        
-        # 2. 조건식 수정 (정규표현식 사용)
-        if [[ "$CURRENT_BUILD_NUMBER" =~ \$\([A-Z_]+\) ]]; then
-            echo "Resetting invalid build number format..."
-            /usr/libexec/PlistBuddy -c "Set :CFBundleVersion 1" "$INFO_PLIST_PATH"
-            CURRENT_BUILD_NUMBER=1
-        fi
-
-        # 3. 빌드 번호 증가
-        NEW_BUILD_NUMBER=$((CURRENT_BUILD_NUMBER + 1))
-        /usr/libexec/PlistBuddy -c "Set :CFBundleVersion $NEW_BUILD_NUMBER" "$INFO_PLIST_PATH"
-        echo "Updated iOS build number to $NEW_BUILD_NUMBER."
-
-        # 4. 배포 대상 설정 (안전한 추가)
-        if ! /usr/libexec/PlistBuddy -c "Print :IPHONEOS_DEPLOYMENT_TARGET" "$INFO_PLIST_PATH" &>/dev/null; then
-            /usr/libexec/PlistBuddy -c "Add :IPHONEOS_DEPLOYMENT_TARGET string 12.0" "$INFO_PLIST_PATH"
-        fi
-        /usr/libexec/PlistBuddy -c "Set :IPHONEOS_DEPLOYMENT_TARGET 12.0" "$INFO_PLIST_PATH"
-        echo "Set deployment target to iOS 12.0."
-    else
-        echo "##vso[task.logissue type=error] Info.plist not found at $INFO_PLIST_PATH"
-        exit 1
-    fi
-  displayName: 'Increment Build Number and Set Deployment Target'
-
-- script: |
-    # Enhanced backup script for Hermes iOS arm64 files with detailed logging
-    echo "Starting Hermes files backup process..."
-    
-    # Define backup directory
-    HERMES_BACKUP_DIR="$(Build.SourcesDirectory)/hermes_backup"
-    mkdir -p "$HERMES_BACKUP_DIR"
-    
-    # Define all possible paths where hermes.xcframework might be located
-    POSSIBLE_PATHS=(
-      "$(Build.SourcesDirectory)/ios/Pods/hermes-engine/destroot/Library/Frameworks/universal/hermes.xcframework"
-      "$(Build.SourcesDirectory)/ios/Pods/hermes-engine/destroot/Library/Frameworks/iphoneos/hermes.framework"
-      "$(Build.SourcesDirectory)/ios/Pods/hermes-engine/destroot/Library/Frameworks/hermes.xcframework"
-    )
-    
-    echo "Checking for hermes.xcframework in possible locations..."
-    FOUND_HERMES=false
-    
-    for POSSIBLE_PATH in "${POSSIBLE_PATHS[@]}"; do
-      echo "Checking path: $POSSIBLE_PATH"
-      if [ -d "$POSSIBLE_PATH" ]; then
-        echo "✅ Found Hermes at: $POSSIBLE_PATH"
-        HERMES_XCFRAMEWORK_PATH="$POSSIBLE_PATH"
-        FOUND_HERMES=true
-        break
-      else
-        echo "❌ Not found at: $POSSIBLE_PATH"
-      fi
-    done
-    
-    if [ "$FOUND_HERMES" = true ]; then
-      echo "Found hermes.xcframework at: $HERMES_XCFRAMEWORK_PATH"
-      
-      # Find and backup all ios-arm64* directories
-      ARM64_DIRS=$(find "$HERMES_XCFRAMEWORK_PATH" -type d -name "ios-arm64*" 2>/dev/null || echo "")
-      
-      if [ -n "$ARM64_DIRS" ]; then
-        echo "Found the following ios-arm64 directories to backup:"
-        echo "$ARM64_DIRS"
-        
-        for ARCH_DIR in $ARM64_DIRS; do
-          DIR_NAME=$(basename "$ARCH_DIR")
-          echo "Backing up architecture directory: $DIR_NAME"
-          
-          # Create backup directory for this architecture
-          mkdir -p "$HERMES_BACKUP_DIR/$DIR_NAME"
-          
-          # Copy all contents from this architecture directory
-          cp -R "$ARCH_DIR"/* "$HERMES_BACKUP_DIR/$DIR_NAME/" || echo "Warning: Some files could not be copied from $ARCH_DIR"
-          echo "✅ Backed up $DIR_NAME"
-        done
-        
-        # Create a marker file to indicate successful backup
-        echo "$(date)" > "$HERMES_BACKUP_DIR/backup_completed"
-        echo "Hermes backup completed successfully!"
-      else
-        echo "No ios-arm64 directories found in $HERMES_XCFRAMEWORK_PATH"
-        ls -la "$HERMES_XCFRAMEWORK_PATH" || echo "Cannot list directory contents"
-        find "$HERMES_XCFRAMEWORK_PATH" -type d -name "*" | grep -i arm || echo "No arm-related directories found"
-      fi
-    else
-      echo "hermes.xcframework not found at any expected location. First-time build?"
-      echo "This is normal for first builds. Will continue without backup."
-      echo "Will create a new Hermes during pod install."
-      
-      # Create a marker file to indicate we're on first build
-      echo "$(date)" > "$HERMES_BACKUP_DIR/first_build"
-    fi
-    
-    # Don't fail the build if we couldn't backup - this is expected on first run
-    exit 0
-  displayName: 'Backup Hermes Files with Enhanced Logging'
-  
 - task: NodeTool@0
   inputs:
     versionSpec: '18.x'  # React Native와 호환되는 안정적인 버전 사용
@@ -384,54 +279,68 @@ steps:
   displayName: 'Setup Bridging Header with sed'
 
 - script: |
-    # Restore backed-up Hermes files to their exact locations
-    echo "Restoring backed-up Hermes files to architecture-specific locations..."
-
-    HERMES_BACKUP_DIR="$(Build.SourcesDirectory)/hermes_backup"
-    HERMES_XCFRAMEWORK_PATH="$(Build.SourcesDirectory)/ios/Pods/hermes-engine/destroot/Library/Frameworks/universal/hermes.xcframework"
+    # Copy hermes files from AppSealingSDK to the Pods directory
+    echo "Copying hermes files from AppSealingSDK to the Pods directory..."
     
-    # Check if backup directory exists
-    if [ ! -d "$HERMES_BACKUP_DIR" ]; then
-      echo "No Hermes backup found. Skipping restore."
-      exit 0
-    fi
+    # Source directories (search for hermes files in AppSealingSDK)
+    APP_SEALING_SDK_DIR="$(Build.SourcesDirectory)/ios/AppSealingSDK"
+    HERMES_SOURCE_FILES=$(find "$APP_SEALING_SDK_DIR" -name "*hermes*" -type f 2>/dev/null || echo "")
     
-    # Check if destination hermes.xcframework exists after pod install
-    if [ ! -d "$HERMES_XCFRAMEWORK_PATH" ]; then
-      echo "Error: hermes.xcframework not found after pod install!"
-      exit 1
-    fi
-    
-    # Restore each architecture-specific directory
-    for ARCH_DIR in "$HERMES_BACKUP_DIR"/*; do
-      if [ -d "$ARCH_DIR" ]; then
-        DIR_NAME=$(basename "$ARCH_DIR")
-        DEST_DIR="$HERMES_XCFRAMEWORK_PATH/$DIR_NAME"
-        
-        echo "Restoring architecture: $DIR_NAME to $DEST_DIR"
-        
-        # Ensure destination directory exists
-        if [ -d "$DEST_DIR" ]; then
-          # Backup any dSYM files if they exist in the new installation
-          if [ -d "$DEST_DIR/dSYMs" ]; then
-            mkdir -p "$ARCH_DIR/dSYMs"
-            cp -R "$DEST_DIR/dSYMs"/* "$ARCH_DIR/dSYMs/"
-            echo "Preserved dSYMs from new installation"
-          fi
-          
-          # Remove destination and replace with backup
-          rm -rf "$DEST_DIR"/*
-          cp -R "$ARCH_DIR"/* "$DEST_DIR/"
-          echo "✅ Restored $DIR_NAME"
-        else
-          echo "⚠️ Destination directory $DEST_DIR does not exist. Cannot restore."
-        fi
-      fi
+    # Log available hermes files
+    echo "Found the following hermes files in AppSealingSDK:"
+    for FILE in $HERMES_SOURCE_FILES; do
+      echo " - $FILE"
     done
     
-    echo "Hermes restore completed!"
-  displayName: 'Restore Hermes Files'
-
+    # Destination directory structure (where hermes files should be copied to)
+    HERMES_DEST_DIR="$(Build.SourcesDirectory)/ios/Pods/hermes-engine/destroot/Library/Frameworks/universal/hermes.xcframework"
+    IOS_ARM64_DIR="$HERMES_DEST_DIR/ios-arm64"
+    
+    # Check if pod install has completed and created the destination structure
+    if [ ! -d "$HERMES_DEST_DIR" ]; then
+      echo "Creating destination directory structure..."
+      mkdir -p "$IOS_ARM64_DIR"
+    fi
+    
+    # Check if we found ios-arm64 directories in destination
+    if [ -d "$HERMES_DEST_DIR" ]; then
+      # Find all ios-arm64* directories in destination
+      ARM64_DIRS=$(find "$HERMES_DEST_DIR" -type d -name "ios-arm64*" 2>/dev/null || echo "")
+      
+      if [ -n "$ARM64_DIRS" ]; then
+        echo "Found the following ios-arm64 directories to copy to:"
+        echo "$ARM64_DIRS"
+        
+        # Copy hermes files to each arm64 directory
+        for DIR in $ARM64_DIRS; do
+          echo "Copying hermes files to $DIR..."
+          
+          # Copy all relevant files
+          for FILE in $HERMES_SOURCE_FILES; do
+            FILENAME=$(basename "$FILE")
+            echo "Copying $FILENAME to $DIR"
+            cp -f "$FILE" "$DIR/" || echo "Warning: Failed to copy $FILENAME"
+          done
+        done
+        
+        echo "✅ Hermes files copied successfully!"
+      else
+        echo "No ios-arm64 directories found in $HERMES_DEST_DIR"
+        echo "Creating ios-arm64 directory and copying files..."
+        mkdir -p "$IOS_ARM64_DIR"
+        
+        for FILE in $HERMES_SOURCE_FILES; do
+          FILENAME=$(basename "$FILE")
+          echo "Copying $FILENAME to $IOS_ARM64_DIR"
+          cp -f "$FILE" "$IOS_ARM64_DIR/" || echo "Warning: Failed to copy $FILENAME"
+        done
+      fi
+    else
+      echo "Destination directory $HERMES_DEST_DIR doesn't exist after pod install."
+      echo "This is unusual. Pod installation may have failed or the hermes-engine structure is different."
+    fi
+  displayName: 'Copy Hermes Files from AppSealingSDK'
+  
 - script: |
     EXPORT_DIR="$(Build.ArtifactStagingDirectory)"
     ARCHIVE_PATH="$EXPORT_DIR/${APP_NAME}.xcarchive"
