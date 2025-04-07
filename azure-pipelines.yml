@@ -257,14 +257,14 @@ steps:
 - script: |
     echo "Creating Bridging Header..."
     cat > ios/Azure_RN078-Bridging-Header.h << 'EOF'
-    #import <React/RCTBridgeModule.h>
-    #import <React/RCTBridge.h>
-    #import <React/RCTEventDispatcher.h>
-    #import <React/RCTRootView.h>
-    #import <React/RCTUtils.h>
-    #import <React/RCTConvert.h>
-    #import <React/RCTBundleURLProvider.h>
-EOF
+        #import <React/RCTBridgeModule.h>
+        #import <React/RCTBridge.h>
+        #import <React/RCTEventDispatcher.h>
+        #import <React/RCTRootView.h>
+        #import <React/RCTUtils.h>
+        #import <React/RCTConvert.h>
+        #import <React/RCTBundleURLProvider.h>
+    EOF
 
     echo "Updating Xcode project for Bridging Header..."
     plutil -replace "SWIFT_OBJC_BRIDGING_HEADER" -string "Azure_RN078-Bridging-Header.h" ios/Azure_RN078.xcodeproj/project.pbxproj
@@ -292,7 +292,7 @@ EOF
       PROVISIONING_PROFILE_SPECIFIER="$(PROVISIONING_PROFILE_NAME)" \
       SWIFT_OBJC_BRIDGING_HEADER="Azure_RN078-Bridging-Header.h" \
       -archivePath "$(Build.ArtifactStagingDirectory)/${APP_NAME}.xcarchive"
-      
+
     # 3. IPA 내보내기
     xcodebuild -exportArchive \
       -archivePath "$ARCHIVE_PATH" \
