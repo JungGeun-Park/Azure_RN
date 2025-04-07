@@ -206,19 +206,38 @@ steps:
 
 # Pod 설치 (포드 캐시 정리 후)
 - script: |
-    export GEM_HOME=$HOME/.gem
-    export PATH=$GEM_HOME/bin:$PATH
-
-    echo "Installing CocoaPods..."
-    gem install cocoapods --user-install
-
-    echo "Cleaning Pod cache and installing Pods..."
-    cd ios
-    rm -rf Pods Podfile.lock ~/Library/Caches/CocoaPods
-    pod deintegrate || true
-    pod install --repo-update
-  displayName: 'Install CocoaPods'
+    # First, detect the app name correctly
+    APP_NAME=$(ls ios | grep ".xcodeproj" | sed 's/.xcodeproj//')
+    echo "Detected app name: $APP_NAME"
     
+    # Create Podfile with proper variable substitution
+    cat > ios/Podfile << EOF
+    require_relative '../node_modules/react-native/scripts/react_native_pods'
+    require_relative '../node_modules/@react-native-community/cli-platform-ios/native_modules'
+    
+    platform :ios, min_ios_version_supported
+    prepare_react_native_project!
+    
+    target '$APP_NAME' do
+      config = use_native_modules!
+      use_react_native!(
+        :path => config[:reactNativePath],
+        :app_path => "#{Pod::Config.instance.installation_root}/.."
+      )
+    end
+    
+    post_install do |installer|
+      react_native_post_install(installer)
+    end
+    EOF
+    
+    # Now run pod install with correct PATH
+    cd ios
+    export GEM_HOME=$HOME/.gem
+    export PATH=$GEM_HOME/ruby/2.6.0/bin:$PATH
+    pod install --repo-update
+  displayName: 'Fix Podfile and Install Pods'
+      
 - script: |  # Bundle ID 추출 단계 추가
     INFO_PLIST_PATH="ios/${APP_NAME}/Info.plist"
     if [ -f "$INFO_PLIST_PATH" ]; then
