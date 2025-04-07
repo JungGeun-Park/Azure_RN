@@ -349,6 +349,8 @@ steps:
 - script: |
     # Grant execution permission to generate_hash script
     HASH_SCRIPT_PATH="$(Build.SourcesDirectory)/ios/AppSealingSDK/generate_hash"
+    cd "$(Build.SourcesDirectory)/ios"
+    ls -al
     EXPORT_DIR="$(Build.ArtifactStagingDirectory)"
     IPA_PATH=$(find "$EXPORT_DIR" -type f -name "*.ipa" | head -n 1)
 
