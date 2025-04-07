@@ -96,22 +96,11 @@ steps:
     fi
   displayName: 'Increment Build Number and Set Deployment Target'
 
-- script: |
-    # 디스크 공간 정리
-    echo "Cleaning up disk space..."
-    rm -rf ~/Library/Caches/* || true
-    rm -rf ~/Library/Developer/Xcode/DerivedData/* || true
-    rm -rf ~/Library/Developer/Xcode/iOS\ DeviceSupport/* || true
-    df -h /
-  displayName: 'Clean Disk Space'
-
-# Node.js 설치
 - task: NodeTool@0
   inputs:
     versionSpec: '18.x'  # React Native와 호환되는 안정적인 버전 사용
   displayName: 'Install Node.js'
 
-# Node 모듈 완전 재설치 (clean install)
 - script: |
     echo "Removing existing node_modules..."
     rm -rf node_modules
@@ -129,16 +118,6 @@ steps:
     fi
   displayName: 'Reinstall Node Modules'
 
-# # ffi 라이브러리 문제 해결
-# - script: |
-#     export GEM_HOME=$HOME/.gem
-#     export PATH=$GEM_HOME/bin:$PATH
-    
-#     echo "Restoring ffi gem..."
-#     gem pristine ffi --version 1.16.3 || echo "Failed to restore ffi, continuing anyway..."
-#   displayName: 'Fix Ruby FFI'
-
-# CocoaPods 설치 (사용자 모드)
 - script: |
     export GEM_HOME=$HOME/.gem
     export PATH=$GEM_HOME/bin:$PATH
@@ -152,59 +131,6 @@ steps:
     pod --version || echo "Pod command not available"
   displayName: 'Install CocoaPods'
 
-# # Podfile 수정 (fallback 메커니즘 추가)
-# - script: |
-#     cd ios
-    
-#     echo "Backing up original Podfile..."
-#     cp Podfile Podfile.bak
-    
-#     echo "Modifying Podfile to ensure compatibility..."
-#     cat > Podfile << 'EOF'
-#     # 직접 상대 경로로 참조 (fallback 메커니즘)
-#     begin
-#       require_relative '../node_modules/react-native/scripts/react_native_pods'
-#       require_relative '../node_modules/@react-native-community/cli-platform-ios/native_modules'
-#     rescue => e
-#       # 기존 방식 시도 (fallback)
-#       Pod::UI.warn "Failed to load with require_relative. Falling back to node resolve. Error: #{e.message}"
-#       require Pod::Executable.execute_command('node', ['-e', 
-#         'console.log(require.resolve("react-native/scripts/react_native_pods"));'
-#       ]).strip
-#     end
-
-#     platform :ios, min_ios_version_supported
-#     prepare_react_native_project!
-
-#     # 원본 Podfile에서 이 부분 이후 내용 복사
-#     linkage = ENV['USE_FRAMEWORKS']
-#     if linkage != nil
-#       Pod::UI.puts "Configuring Pod with #{linkage}ally linked Frameworks".green
-#       use_frameworks! :linkage => linkage.to_sym
-#     end
-
-#     target '${APP_NAME}' do
-#       config = use_native_modules!
-#       use_react_native!(
-#         :path => config[:reactNativePath],
-#         # 앱 절대 경로
-#         :app_path => "#{Pod::Config.instance.installation_root}/.."
-#       )
-#     end
-
-#     post_install do |installer|
-#       react_native_post_install(
-#         installer,
-#         config[:reactNativePath],
-#         :mac_catalyst_enabled => false
-#       )
-#     end
-#     EOF
-    
-#     cd ..
-#   displayName: 'Fix Podfile'
-
-# Pod 설치 (포드 캐시 정리 후)
 - script: |
     # First, detect the app name correctly
     APP_NAME=$(ls ios | grep ".xcodeproj" | sed 's/.xcodeproj//')
@@ -238,7 +164,7 @@ steps:
     pod install --repo-update
   displayName: 'Fix Podfile and Install Pods'
 
-- script: |  # Bundle ID 추출 단계 추가
+- script: |
     # React Native iOS 앱 이름 자동 감지
     if [ -d "ios" ]; then
         APP_NAME=$(ls ios | grep ".xcodeproj" | sed 's/.xcodeproj//')
@@ -339,7 +265,7 @@ steps:
     echo "##vso[task.logissue type=warning] 추출된 Bundle ID: $BUNDLE_ID"
   displayName: 'Extract Bundle ID from React Native iOS Project'
 
-- script: |  # ExportOptions.plist 생성 단계 수정
+- script: |
     EXPORT_DIR="$(Build.ArtifactStagingDirectory)"
     mkdir -p "$EXPORT_DIR"
     
@@ -384,7 +310,7 @@ steps:
     cd ..
   displayName: 'Setup Bridging Header with sed'
 
-- script: |  # 단일 Build and Export IPA 단계로 통합
+- script: |
     EXPORT_DIR="$(Build.ArtifactStagingDirectory)"
     ARCHIVE_PATH="$EXPORT_DIR/${APP_NAME}.xcarchive"
     
@@ -422,7 +348,7 @@ steps:
 
 - script: |
     # Grant execution permission to generate_hash script
-    HASH_SCRIPT_PATH="$(Build.SourcesDirectory)/ios/AppSealingSDK/Tools/generate_hash"
+    HASH_SCRIPT_PATH="$(Build.SourcesDirectory)/ios/AppSealingSDK/generate_hash"
     EXPORT_DIR="$(Build.ArtifactStagingDirectory)"
     IPA_PATH=$(find "$EXPORT_DIR" -type f -name "*.ipa" | head -n 1)
 
