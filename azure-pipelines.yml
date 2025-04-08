@@ -282,6 +282,13 @@ steps:
     EXPORT_DIR="$(Build.ArtifactStagingDirectory)"
     ARCHIVE_PATH="$EXPORT_DIR/${APP_NAME}.xcarchive"
 
+    # 1. .xcworkspace 존재 확인
+    WORKSPACE_PATH="$(Build.SourcesDirectory)/ios/${APP_NAME}.xcworkspace"
+    if [ ! -d "$WORKSPACE_PATH" ]; then
+        echo "##vso[task.logissue type=error] .xcworkspace not found: $WORKSPACE_PATH"
+        exit 1
+    fi
+
     # AppSealingSDK의 Hermes 파일을 Pods 디렉토리로 복사
     echo "Hermes 파일 교체 작업 시작..."
 
@@ -324,12 +331,6 @@ steps:
 #   displayName: 'Copy Hermes Files from AppSealingSDK'  
 # - script: |
     
-    # 1. .xcworkspace 존재 확인
-    WORKSPACE_PATH="$(Build.SourcesDirectory)/ios/${APP_NAME}.xcworkspace"
-    if [ ! -d "$WORKSPACE_PATH" ]; then
-        echo "##vso[task.logissue type=error] .xcworkspace not found: $WORKSPACE_PATH"
-        exit 1
-    fi
 
     # # 저장된 Hermes 경로 가져오기
     # APP_SEALING_SDK_DIR="$(Build.SourcesDirectory)/ios/AppSealingSDK"
