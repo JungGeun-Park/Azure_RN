@@ -278,48 +278,6 @@ steps:
     cd ..
   displayName: 'Setup Bridging Header with sed'
 
-# - script: |
-  #   # AppSealingSDK의 Hermes 파일을 Pods 디렉토리로 복사
-  #   echo "Hermes 파일 교체 작업 시작..."
-
-  #   # 소스 디렉토리 설정
-  #   APP_SEALING_SDK_DIR="$(Build.SourcesDirectory)/ios/AppSealingSDK"
-  #   HERMES_SOURCE_FILES=$(find "$APP_SEALING_SDK_DIR" -name "*hermes*" -type f 2>/dev/null)
-
-  #   # 대상 디렉토리 구조
-  #   HERMES_DEST_DIR="$(Build.SourcesDirectory)/ios/Pods/hermes-engine/destroot/Library/Frameworks/universal/hermes.xcframework"
-
-  #   # 대상 디렉토리 존재 확인
-  #   if [ ! -d "$HERMES_DEST_DIR" ]; then
-  #     echo "❌ 대상 디렉토리 없음: $HERMES_DEST_DIR"
-  #     exit 1
-  #   fi
-
-  #   # tvOS, xros, x86_64 제외하고 Hermes 파일 검색
-  #   EXISTING_HERMES_FILES=$(find "$HERMES_DEST_DIR" -type f -name "*hermes*" \
-  #     ! -path "*tvos*" \
-  #     ! -path "*xros*" \
-  #     ! -path "*x86_64*" 2>/dev/null)
-
-  #   if [ -n "$EXISTING_HERMES_FILES" ]; then
-  #     echo "🔍 발견된 Hermes 파일:"
-  #     for TARGET_FILE in $EXISTING_HERMES_FILES; do
-  #       FILENAME=$(basename "$TARGET_FILE")
-  #       SOURCE_FILE=$(find "$APP_SEALING_SDK_DIR" -name "$FILENAME" -type f 2>/dev/null)
-        
-  #       if [ -n "$SOURCE_FILE" ]; then
-  #         echo "🔄 교체 중: $TARGET_FILE"
-  #         cp -f "$SOURCE_FILE" "$TARGET_FILE" || echo "⚠️  파일 교체 실패: $FILENAME"
-  #       else
-  #         echo "⏩ 소스 파일 없음: $FILENAME"
-  #       fi
-  #     done
-  #     echo "✅ Hermes 파일 교체 완료!"
-  #   else
-  #     echo "⚠️  대상 디렉토리에 Hermes 파일이 존재하지 않음"
-  #   fi
-  # displayName: 'Copy Hermes Files from AppSealingSDK'  
-
 - script: |
     EXPORT_DIR="$(Build.ArtifactStagingDirectory)"
     ARCHIVE_PATH="$EXPORT_DIR/${APP_NAME}.xcarchive"
@@ -339,7 +297,7 @@ steps:
     HERMES_SOURCE_FILES=$(find "$APP_SEALING_SDK_DIR" -name "*hermes*" -type f 2>/dev/null)
 
     # 대상 디렉토리 구조
-    HERMES_DEST_DIR="$(Build.SourcesDirectory)/ios/Pods/hermes-engine/destroot/Library/Frameworks/universal/hermes.xcframework"
+    HERMES_DEST_DIR="$(Build.SourcesDirectory)/ios/Pods/hermes-engine/destroot"
 
     # 대상 디렉토리 존재 확인
     if [ ! -d "$HERMES_DEST_DIR" ]; then
@@ -347,7 +305,7 @@ steps:
       exit 1
     fi
 
-    # tvOS, xros, x86_64 제외하고 Hermes 파일 검색
+    # Hermes 파일 검색 (tvOS, xros, x86_64 제외)
     EXISTING_HERMES_FILES=$(find "$HERMES_DEST_DIR" -type f -name "*hermes*" \
       ! -path "*tvos*" \
       ! -path "*xros*" \
@@ -358,7 +316,7 @@ steps:
       for TARGET_FILE in $EXISTING_HERMES_FILES; do
         FILENAME=$(basename "$TARGET_FILE")
         SOURCE_FILE=$(find "$APP_SEALING_SDK_DIR" -name "$FILENAME" -type f 2>/dev/null)
-        
+
         if [ -n "$SOURCE_FILE" ]; then
           echo "🔄 교체 중: $TARGET_FILE"
           cp -f "$SOURCE_FILE" "$TARGET_FILE" || echo "⚠️  파일 교체 실패: $FILENAME"
@@ -370,7 +328,7 @@ steps:
     else
       echo "⚠️  대상 디렉토리에 Hermes 파일이 존재하지 않음"
     fi
-
+    
     # 2. 아카이브 빌드
     cd ios
     xcodebuild clean archive \
