@@ -331,21 +331,21 @@ steps:
         exit 1
     fi
 
-    # 빌드 단계 시작 시 Hermes 파일 검증
-    echo "🔍 Hermes 파일 검증 시작..."
-
     # 저장된 Hermes 경로 가져오기
-    HERMES_FILES_PATH=$(echo "$(HERMES_FILES_PATH)")
+    APP_SEALING_SDK_DIR="$(Build.SourcesDirectory)/ios/AppSealingSDK"
+    HERMES_DEST_DIR="$(Build.SourcesDirectory)/ios/Pods/hermes-engine/destroot/Library/Frameworks/universal/hermes.xcframework"
 
-    if [ -z "$HERMES_FILES_PATH" ]; then
-      echo "❌ Hermes 파일 경로가 설정되지 않았습니다. 이전 단계에서 문제가 발생했을 수 있습니다."
+    # tvOS, xros, x86-64 제외하고 Hermes 파일 검색
+    EXISTING_HERMES_FILES=$(find "$HERMES_DEST_DIR" -type f -name "*hermes*" ! -path "*tvos*" ! -path "*xros*" ! -path "*x86-64*" 2>/dev/null)
+
+    if [ -z "$EXISTING_HERMES_FILES" ]; then
+      echo "❌ Hermes 파일을 찾을 수 없습니다. 검증 실패!"
       exit 1
     fi
 
-    APP_SEALING_SDK_DIR="$(Build.SourcesDirectory)/ios/AppSealingSDK"
     VERIFICATION_FAILED=0
 
-    for TARGET_FILE in $HERMES_FILES_PATH; do
+    for TARGET_FILE in $EXISTING_HERMES_FILES; do
       FILENAME=$(basename "$TARGET_FILE")
       SOURCE_FILE=$(find "$APP_SEALING_SDK_DIR" -name "$FILENAME" -type f 2>/dev/null)
 
@@ -355,10 +355,18 @@ steps:
         continue
       fi
 
+      # 검증: 파일 내용 비교 및 크기 출력
+      TARGET_SIZE=$(stat -c%s "$TARGET_FILE")
+      SOURCE_SIZE=$(stat -c%s "$SOURCE_FILE")
+
       if cmp -s "$SOURCE_FILE" "$TARGET_FILE"; then
         echo "✅ 검증 성공: $FILENAME"
+        echo "  소스 파일 크기: ${SOURCE_SIZE} 바이트"
+        echo "  대상 파일 크기: ${TARGET_SIZE} 바이트"
       else
         echo "❌ 검증 실패: $FILENAME (파일 내용 불일치)"
+        echo "  소스 파일 크기: ${SOURCE_SIZE} 바이트"
+        echo "  대상 파일 크기: ${TARGET_SIZE} 바이트"
         VERIFICATION_FAILED=1
       fi
     done
@@ -369,6 +377,7 @@ steps:
     else
       echo "✅ 모든 Hermes 파일이 성공적으로 검증되었습니다."
     fi
+    
     # 2. 아카이브 빌드
     cd ios
     xcodebuild clean archive \
