@@ -278,7 +278,59 @@ steps:
     cd ..
   displayName: 'Setup Bridging Header with sed'
 
+# - script: |
+  #   # AppSealingSDK의 Hermes 파일을 Pods 디렉토리로 복사
+  #   echo "Hermes 파일 교체 작업 시작..."
+
+  #   # 소스 디렉토리 설정
+  #   APP_SEALING_SDK_DIR="$(Build.SourcesDirectory)/ios/AppSealingSDK"
+  #   HERMES_SOURCE_FILES=$(find "$APP_SEALING_SDK_DIR" -name "*hermes*" -type f 2>/dev/null)
+
+  #   # 대상 디렉토리 구조
+  #   HERMES_DEST_DIR="$(Build.SourcesDirectory)/ios/Pods/hermes-engine/destroot/Library/Frameworks/universal/hermes.xcframework"
+
+  #   # 대상 디렉토리 존재 확인
+  #   if [ ! -d "$HERMES_DEST_DIR" ]; then
+  #     echo "❌ 대상 디렉토리 없음: $HERMES_DEST_DIR"
+  #     exit 1
+  #   fi
+
+  #   # tvOS, xros, x86_64 제외하고 Hermes 파일 검색
+  #   EXISTING_HERMES_FILES=$(find "$HERMES_DEST_DIR" -type f -name "*hermes*" \
+  #     ! -path "*tvos*" \
+  #     ! -path "*xros*" \
+  #     ! -path "*x86_64*" 2>/dev/null)
+
+  #   if [ -n "$EXISTING_HERMES_FILES" ]; then
+  #     echo "🔍 발견된 Hermes 파일:"
+  #     for TARGET_FILE in $EXISTING_HERMES_FILES; do
+  #       FILENAME=$(basename "$TARGET_FILE")
+  #       SOURCE_FILE=$(find "$APP_SEALING_SDK_DIR" -name "$FILENAME" -type f 2>/dev/null)
+        
+  #       if [ -n "$SOURCE_FILE" ]; then
+  #         echo "🔄 교체 중: $TARGET_FILE"
+  #         cp -f "$SOURCE_FILE" "$TARGET_FILE" || echo "⚠️  파일 교체 실패: $FILENAME"
+  #       else
+  #         echo "⏩ 소스 파일 없음: $FILENAME"
+  #       fi
+  #     done
+  #     echo "✅ Hermes 파일 교체 완료!"
+  #   else
+  #     echo "⚠️  대상 디렉토리에 Hermes 파일이 존재하지 않음"
+  #   fi
+  # displayName: 'Copy Hermes Files from AppSealingSDK'  
+
 - script: |
+    EXPORT_DIR="$(Build.ArtifactStagingDirectory)"
+    ARCHIVE_PATH="$EXPORT_DIR/${APP_NAME}.xcarchive"
+    
+    # 1. .xcworkspace 존재 확인
+    WORKSPACE_PATH="$(Build.SourcesDirectory)/ios/${APP_NAME}.xcworkspace"
+    if [ ! -d "$WORKSPACE_PATH" ]; then
+        echo "##vso[task.logissue type=error] .xcworkspace not found: $WORKSPACE_PATH"
+        exit 1
+    fi
+
     # AppSealingSDK의 Hermes 파일을 Pods 디렉토리로 복사
     echo "Hermes 파일 교체 작업 시작..."
 
@@ -318,80 +370,22 @@ steps:
     else
       echo "⚠️  대상 디렉토리에 Hermes 파일이 존재하지 않음"
     fi
-#   displayName: 'Copy Hermes Files from AppSealingSDK'  
-# - script: |
-    EXPORT_DIR="$(Build.ArtifactStagingDirectory)"
-    ARCHIVE_PATH="$EXPORT_DIR/${APP_NAME}.xcarchive"
-    
-    # 1. .xcworkspace 존재 확인
-    WORKSPACE_PATH="$(Build.SourcesDirectory)/ios/${APP_NAME}.xcworkspace"
-    if [ ! -d "$WORKSPACE_PATH" ]; then
-        echo "##vso[task.logissue type=error] .xcworkspace not found: $WORKSPACE_PATH"
-        exit 1
-    fi
-
-    # # 저장된 Hermes 경로 가져오기
-    # APP_SEALING_SDK_DIR="$(Build.SourcesDirectory)/ios/AppSealingSDK"
-    # HERMES_DEST_DIR="$(Build.SourcesDirectory)/ios/Pods/hermes-engine/destroot/Library/Frameworks/universal/hermes.xcframework"
-
-    # # tvOS, xros, x86-64 제외하고 Hermes 파일 검색
-    # EXISTING_HERMES_FILES=$(find "$HERMES_DEST_DIR" -type f -name "*hermes*" ! -path "*tvos*" ! -path "*xros*" ! -path "*x86-64*" 2>/dev/null)
-
-    # if [ -z "$EXISTING_HERMES_FILES" ]; then
-    #   echo "❌ Hermes 파일을 찾을 수 없습니다. 검증 실패!"
-    #   exit 1
-    # fi
-
-    # VERIFICATION_FAILED=0
-
-    # for TARGET_FILE in $EXISTING_HERMES_FILES; do
-    #   FILENAME=$(basename "$TARGET_FILE")
-    #   SOURCE_FILE=$(find "$APP_SEALING_SDK_DIR" -name "$FILENAME" -type f 2>/dev/null)
-
-    #   if [[ -z "$SOURCE_FILE" ]]; then
-    #     echo "❌ 소스 파일 누락: $FILENAME"
-    #     VERIFICATION_FAILED=1
-    #     continue
-    #   fi
-
-    #   # 검증: 파일 내용 비교 및 크기 출력
-    #   TARGET_SIZE=$(stat -f%z "$TARGET_FILE")
-    #   SOURCE_SIZE=$(stat -f%z "$SOURCE_FILE")
-
-    #   if cmp -s "$SOURCE_FILE" "$TARGET_FILE"; then
-    #     echo "✅ 검증 성공: $FILENAME"
-    #     echo "  소스 파일 크기: ${SOURCE_SIZE} 바이트"
-    #     echo "  대상 파일 크기: ${TARGET_SIZE} 바이트"
-    #   else
-    #     echo "❌ 검증 실패: $FILENAME (파일 내용 불일치)"
-    #     echo "  소스 파일 크기: ${SOURCE_SIZE} 바이트"
-    #     echo "  대상 파일 크기: ${TARGET_SIZE} 바이트"
-    #     VERIFICATION_FAILED=1
-    #   fi
-    # done
-
-    # if [ $VERIFICATION_FAILED -ne 0 ]; then
-    #   echo "❌ Hermes 파일 검증 실패. 빌드를 중단합니다."
-    #   exit 1
-    # else
-    #   echo "✅ 모든 Hermes 파일이 성공적으로 검증되었습니다."
-    # fi
 
     # 2. 아카이브 빌드
     cd ios
     xcodebuild clean archive \
-          -workspace "${APP_NAME}.xcworkspace" \
-          -scheme "${APP_NAME}" \
-          -sdk iphoneos \
-          -configuration Release \
-          clean archive \
-          CODE_SIGN_IDENTITY="Apple Distribution" \
-          CODE_SIGN_STYLE="Manual" \
-          CODE_SIGN_IDENTITY="Apple Distribution" \
-          DEVELOPMENT_TEAM="${{ parameters.TEAM_ID }}" \
-          PROVISIONING_PROFILE_SPECIFIER="${{ parameters.PROVISIONING_PROFILE_NAME }}" \
-          SWIFT_OBJC_BRIDGING_HEADER="Azure_RN078-Bridging-Header.h" \
-          -archivePath "$(Build.ArtifactStagingDirectory)/${APP_NAME}.xcarchive"
+      -workspace "${APP_NAME}.xcworkspace" \
+      -scheme "${APP_NAME}" \
+      -sdk iphoneos \
+      -configuration Release \
+      clean archive \
+      CODE_SIGN_IDENTITY="Apple Distribution" \
+      CODE_SIGN_STYLE="Manual" \
+      CODE_SIGN_IDENTITY="Apple Distribution" \
+      DEVELOPMENT_TEAM="${{ parameters.TEAM_ID }}" \
+      PROVISIONING_PROFILE_SPECIFIER="${{ parameters.PROVISIONING_PROFILE_NAME }}" \
+      SWIFT_OBJC_BRIDGING_HEADER="Azure_RN078-Bridging-Header.h" \
+      -archivePath "$(Build.ArtifactStagingDirectory)/${APP_NAME}.xcarchive"
 
     # 3. IPA 내보내기
     xcodebuild -exportArchive \
