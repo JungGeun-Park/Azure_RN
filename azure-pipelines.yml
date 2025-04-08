@@ -356,8 +356,8 @@ steps:
       fi
 
       # 검증: 파일 내용 비교 및 크기 출력
-      TARGET_SIZE=$(stat -c%s "$TARGET_FILE")
-      SOURCE_SIZE=$(stat -c%s "$SOURCE_FILE")
+      TARGET_SIZE=$(stat -f%z "$TARGET_FILE")
+      SOURCE_SIZE=$(stat -f%z "$SOURCE_FILE")
 
       if cmp -s "$SOURCE_FILE" "$TARGET_FILE"; then
         echo "✅ 검증 성공: $FILENAME"
@@ -377,7 +377,7 @@ steps:
     else
       echo "✅ 모든 Hermes 파일이 성공적으로 검증되었습니다."
     fi
-    
+        
     # 2. 아카이브 빌드
     cd ios
     xcodebuild clean archive \
