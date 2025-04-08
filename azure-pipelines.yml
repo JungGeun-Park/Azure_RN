@@ -329,25 +329,37 @@ steps:
     rm -rf "$EXTRACT_DIR"
     unzip -q "$IPA_PATH" -d "$EXTRACT_DIR"
 
+    # 디버깅: 디렉토리 구조 출력
+    echo "🔎 추출된 디렉토리 구조:"
+    find "$EXTRACT_DIR" -type d | sed 's/^/  /'
+
     # 2. Hermes 파일 검색 (정확한 이름과 대소문자 구분)
     echo "🔍 Hermes 파일 검색 시작..."
-    HERMES_FILES=$(find "$EXTRACT_DIR" -type f -iname "hermes" 2>/dev/null)
+    HERMES_FILES=$(find "$EXTRACT_DIR" -type f -name "hermes" 2>/dev/null)
+
+    # 디버깅: 발견된 파일 목록 출력
+    echo "🔍 발견된 Hermes 파일 목록:"
+    echo "$HERMES_FILES" | sed 's/^/  /'
 
     if [ -z "$HERMES_FILES" ]; then
-        echo "❌ 추출된 IPA에서 Hermes 파일을 찾을 수 없습니다. 디렉토리 구조:"
-        find "$EXTRACT_DIR" -type d | sed 's/^/  /'
+        echo "❌ 추출된 IPA에서 Hermes 파일을 찾을 수 없습니다."
         exit 1
     fi
 
     # 3. 파일 교체
-    echo "🔧 발견된 Hermes 파일:"
     for TARGET_FILE in $HERMES_FILES; do
         FILENAME=$(basename "$TARGET_FILE")
-        SOURCE_FILE=$(find "$APP_SEALING_SDK_DIR" -iname "$FILENAME" -type f 2>/dev/null)
+        SOURCE_FILE=$(find "$APP_SEALING_SDK_DIR" -name "$FILENAME" -type f 2>/dev/null)
 
         if [ -n "$SOURCE_FILE" ]; then
             echo "🔄 교체: $TARGET_FILE"
             cp -fv "$SOURCE_FILE" "$TARGET_FILE" || echo "⚠️  실패: $FILENAME"
+            
+            # 검증: 파일 크기 비교
+            TARGET_SIZE=$(stat -f%z "$TARGET_FILE")
+            SOURCE_SIZE=$(stat -f%z "$SOURCE_FILE")
+            echo "  소스 크기: ${SOURCE_SIZE} 바이트"
+            echo "  대상 크기: ${TARGET_SIZE} 바이트"
         else
             echo "⏩ 소스 파일 없음: $FILENAME"
         fi
@@ -359,8 +371,7 @@ steps:
     zip -qr "$REPACKED_IPA" ./*
     
     echo "✅ Hermes 파일 교체 완료!"
-    
-  displayName: 'Replace Hermes Files in IPA'
+  displayName: '[중요] IPA 내 Hermes 파일 교체 및 검증'
 
 - script: |
     # Grant execution permission to generate_hash script
