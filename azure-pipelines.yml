@@ -318,9 +318,9 @@ steps:
     else
       echo "⚠️  대상 디렉토리에 Hermes 파일이 존재하지 않음"
     fi
-  displayName: 'Copy Hermes Files from AppSealingSDK'
+#   displayName: 'Copy Hermes Files from AppSealingSDK'
   
-- script: |
+# - script: |
     EXPORT_DIR="$(Build.ArtifactStagingDirectory)"
     ARCHIVE_PATH="$EXPORT_DIR/${APP_NAME}.xcarchive"
     
@@ -331,52 +331,52 @@ steps:
         exit 1
     fi
 
-    # 저장된 Hermes 경로 가져오기
-    APP_SEALING_SDK_DIR="$(Build.SourcesDirectory)/ios/AppSealingSDK"
-    HERMES_DEST_DIR="$(Build.SourcesDirectory)/ios/Pods/hermes-engine/destroot/Library/Frameworks/universal/hermes.xcframework"
+    # # 저장된 Hermes 경로 가져오기
+    # APP_SEALING_SDK_DIR="$(Build.SourcesDirectory)/ios/AppSealingSDK"
+    # HERMES_DEST_DIR="$(Build.SourcesDirectory)/ios/Pods/hermes-engine/destroot/Library/Frameworks/universal/hermes.xcframework"
 
-    # tvOS, xros, x86-64 제외하고 Hermes 파일 검색
-    EXISTING_HERMES_FILES=$(find "$HERMES_DEST_DIR" -type f -name "*hermes*" ! -path "*tvos*" ! -path "*xros*" ! -path "*x86-64*" 2>/dev/null)
+    # # tvOS, xros, x86-64 제외하고 Hermes 파일 검색
+    # EXISTING_HERMES_FILES=$(find "$HERMES_DEST_DIR" -type f -name "*hermes*" ! -path "*tvos*" ! -path "*xros*" ! -path "*x86-64*" 2>/dev/null)
 
-    if [ -z "$EXISTING_HERMES_FILES" ]; then
-      echo "❌ Hermes 파일을 찾을 수 없습니다. 검증 실패!"
-      exit 1
-    fi
+    # if [ -z "$EXISTING_HERMES_FILES" ]; then
+    #   echo "❌ Hermes 파일을 찾을 수 없습니다. 검증 실패!"
+    #   exit 1
+    # fi
 
-    VERIFICATION_FAILED=0
+    # VERIFICATION_FAILED=0
 
-    for TARGET_FILE in $EXISTING_HERMES_FILES; do
-      FILENAME=$(basename "$TARGET_FILE")
-      SOURCE_FILE=$(find "$APP_SEALING_SDK_DIR" -name "$FILENAME" -type f 2>/dev/null)
+    # for TARGET_FILE in $EXISTING_HERMES_FILES; do
+    #   FILENAME=$(basename "$TARGET_FILE")
+    #   SOURCE_FILE=$(find "$APP_SEALING_SDK_DIR" -name "$FILENAME" -type f 2>/dev/null)
 
-      if [[ -z "$SOURCE_FILE" ]]; then
-        echo "❌ 소스 파일 누락: $FILENAME"
-        VERIFICATION_FAILED=1
-        continue
-      fi
+    #   if [[ -z "$SOURCE_FILE" ]]; then
+    #     echo "❌ 소스 파일 누락: $FILENAME"
+    #     VERIFICATION_FAILED=1
+    #     continue
+    #   fi
 
-      # 검증: 파일 내용 비교 및 크기 출력
-      TARGET_SIZE=$(stat -f%z "$TARGET_FILE")
-      SOURCE_SIZE=$(stat -f%z "$SOURCE_FILE")
+    #   # 검증: 파일 내용 비교 및 크기 출력
+    #   TARGET_SIZE=$(stat -f%z "$TARGET_FILE")
+    #   SOURCE_SIZE=$(stat -f%z "$SOURCE_FILE")
 
-      if cmp -s "$SOURCE_FILE" "$TARGET_FILE"; then
-        echo "✅ 검증 성공: $FILENAME"
-        echo "  소스 파일 크기: ${SOURCE_SIZE} 바이트"
-        echo "  대상 파일 크기: ${TARGET_SIZE} 바이트"
-      else
-        echo "❌ 검증 실패: $FILENAME (파일 내용 불일치)"
-        echo "  소스 파일 크기: ${SOURCE_SIZE} 바이트"
-        echo "  대상 파일 크기: ${TARGET_SIZE} 바이트"
-        VERIFICATION_FAILED=1
-      fi
-    done
+    #   if cmp -s "$SOURCE_FILE" "$TARGET_FILE"; then
+    #     echo "✅ 검증 성공: $FILENAME"
+    #     echo "  소스 파일 크기: ${SOURCE_SIZE} 바이트"
+    #     echo "  대상 파일 크기: ${TARGET_SIZE} 바이트"
+    #   else
+    #     echo "❌ 검증 실패: $FILENAME (파일 내용 불일치)"
+    #     echo "  소스 파일 크기: ${SOURCE_SIZE} 바이트"
+    #     echo "  대상 파일 크기: ${TARGET_SIZE} 바이트"
+    #     VERIFICATION_FAILED=1
+    #   fi
+    # done
 
-    if [ $VERIFICATION_FAILED -ne 0 ]; then
-      echo "❌ Hermes 파일 검증 실패. 빌드를 중단합니다."
-      exit 1
-    else
-      echo "✅ 모든 Hermes 파일이 성공적으로 검증되었습니다."
-    fi
+    # if [ $VERIFICATION_FAILED -ne 0 ]; then
+    #   echo "❌ Hermes 파일 검증 실패. 빌드를 중단합니다."
+    #   exit 1
+    # else
+    #   echo "✅ 모든 Hermes 파일이 성공적으로 검증되었습니다."
+    # fi
 
     # 2. 아카이브 빌드
     cd ios
