@@ -11,6 +11,7 @@
 		13B07FBF1A68108700A75B9A /* Images.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 13B07FB51A68108700A75B9A /* Images.xcassets */; };
 		25869E8A2DA3AA910097A243 /* AppSealingiOS.mm in Sources */ = {isa = PBXBuildFile; fileRef = 25869E892DA3AA910097A243 /* AppSealingiOS.mm */; };
 		25869E8B2DA3AA910097A243 /* appsealing.lic in Resources */ = {isa = PBXBuildFile; fileRef = 25869E872DA3AA910097A243 /* appsealing.lic */; };
+		25869E8F2DA4E7190097A243 /* libStaticAppSec.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 25869E8D2DA4C4020097A243 /* libStaticAppSec.a */; };
 		59D561D398CB18F5D3E34135 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 13B07FB81A68108700A75B9A /* PrivacyInfo.xcprivacy */; };
 		761780ED2CA45674006654EE /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 761780EC2CA45674006654EE /* AppDelegate.swift */; };
 		81AB9BB82411601600AC10FF /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 81AB9BB72411601600AC10FF /* LaunchScreen.storyboard */; };
@@ -39,6 +40,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				25869E8F2DA4E7190097A243 /* libStaticAppSec.a in Frameworks */,
 				0C80B921A6F3F58F76C31292 /* libPods-Azure_RN078.a in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
