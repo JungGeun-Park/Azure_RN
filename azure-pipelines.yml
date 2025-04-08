@@ -324,54 +324,42 @@ steps:
     REPACKED_IPA="$EXPORT_DIR/repacked_app.ipa"
     APP_SEALING_SDK_DIR="$(Build.SourcesDirectory)/ios/AppSealingSDK"
 
-    if [ ! -f "$IPA_PATH" ]; then
-        echo "❌ IPA 파일을 찾을 수 없습니다: $IPA_PATH"
-        exit 1
-    fi
-
-    echo "📦 IPA 파일 경로: $IPA_PATH"
-    echo "📂 추출 디렉토리: $EXTRACT_DIR"
-    echo "📦 재압축 후 저장 경로: $REPACKED_IPA"
-
     # 1. IPA 파일 추출
-    echo "📂 IPA 파일 추출 중..."
-    mkdir -p "$EXTRACT_DIR"
+    echo "📦 IPA 추출: $IPA_PATH -> $EXTRACT_DIR"
+    rm -rf "$EXTRACT_DIR"
     unzip -q "$IPA_PATH" -d "$EXTRACT_DIR"
 
-    # 2. Hermes 파일 검색 및 교체
-    echo "🔍 Hermes 파일 검색 및 교체 중..."
-    HERMES_FILES=$(find "$EXTRACT_DIR" -type f -name "*hermes*" 2>/dev/null)
+    # 2. Hermes 파일 검색 (정확한 이름과 대소문자 구분)
+    echo "🔍 Hermes 파일 검색 시작..."
+    HERMES_FILES=$(find "$EXTRACT_DIR" -type f -iname "hermes" 2>/dev/null)
 
     if [ -z "$HERMES_FILES" ]; then
-        echo "❌ 추출된 IPA에서 Hermes 파일을 찾을 수 없습니다."
+        echo "❌ 추출된 IPA에서 Hermes 파일을 찾을 수 없습니다. 디렉토리 구조:"
+        find "$EXTRACT_DIR" -type d | sed 's/^/  /'
         exit 1
     fi
 
+    # 3. 파일 교체
+    echo "🔧 발견된 Hermes 파일:"
     for TARGET_FILE in $HERMES_FILES; do
         FILENAME=$(basename "$TARGET_FILE")
-        SOURCE_FILE=$(find "$APP_SEALING_SDK_DIR" -name "$FILENAME" -type f 2>/dev/null)
+        SOURCE_FILE=$(find "$APP_SEALING_SDK_DIR" -iname "$FILENAME" -type f 2>/dev/null)
 
         if [ -n "$SOURCE_FILE" ]; then
-            echo "🔄 교체 중: $TARGET_FILE -> $SOURCE_FILE"
-            cp -f "$SOURCE_FILE" "$TARGET_FILE" || echo "⚠️  파일 교체 실패: $FILENAME"
+            echo "🔄 교체: $TARGET_FILE"
+            cp -fv "$SOURCE_FILE" "$TARGET_FILE" || echo "⚠️  실패: $FILENAME"
         else
-            echo "⏩ 소스 Hermes 파일 없음: $FILENAME"
+            echo "⏩ 소스 파일 없음: $FILENAME"
         fi
     done
 
-    # 3. 변경된 내용을 다시 압축하여 새로운 IPA 생성
-    echo "📦 변경된 내용을 다시 압축하여 새로운 IPA 생성 중..."
+    # 4. 재압축
+    echo "📦 재압축: $REPACKED_IPA"
     cd "$EXTRACT_DIR"
     zip -qr "$REPACKED_IPA" ./*
-    cd -
-
-    if [ ! -f "$REPACKED_IPA" ]; then
-        echo "❌ 재압축된 IPA 생성 실패."
-        exit 1
-    fi
-
-    echo "✅ 재압축된 IPA 생성 완료: $REPACKED_IPA"
-
+    
+    echo "✅ Hermes 파일 교체 완료!"
+    
   displayName: 'Replace Hermes Files in IPA'
 
 - script: |
