@@ -279,6 +279,9 @@ steps:
   displayName: 'Setup Bridging Header with sed'
 
 - script: |
+    EXPORT_DIR="$(Build.ArtifactStagingDirectory)"
+    ARCHIVE_PATH="$EXPORT_DIR/${APP_NAME}.xcarchive"
+
     # AppSealingSDK의 Hermes 파일을 Pods 디렉토리로 복사
     echo "Hermes 파일 교체 작업 시작..."
 
@@ -318,11 +321,8 @@ steps:
     else
       echo "⚠️  대상 디렉토리에 Hermes 파일이 존재하지 않음"
     fi
-#   displayName: 'Copy Hermes Files from AppSealingSDK'
-  
+#   displayName: 'Copy Hermes Files from AppSealingSDK'  
 # - script: |
-    EXPORT_DIR="$(Build.ArtifactStagingDirectory)"
-    ARCHIVE_PATH="$EXPORT_DIR/${APP_NAME}.xcarchive"
     
     # 1. .xcworkspace 존재 확인
     WORKSPACE_PATH="$(Build.SourcesDirectory)/ios/${APP_NAME}.xcworkspace"
