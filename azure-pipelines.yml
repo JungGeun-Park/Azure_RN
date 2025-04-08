@@ -328,6 +328,48 @@ steps:
         exit 1
     fi
 
+    # 🔽🔽🔽 신규 추가된 검증 코드 🔽🔽🔽
+    echo "=== Hermes 파일 사전 검증 시작 ==="
+    HERMES_DEST_DIR="$(Build.SourcesDirectory)/ios/Pods/hermes-engine/destroot/Library/Frameworks/universal/hermes.xcframework"
+    APP_SEALING_SDK_DIR="$(Build.SourcesDirectory)/ios/AppSealingSDK"
+    
+    # 대상 파일 검색 (tvOS, xros, x86-64 제외)
+    mapfile -t TARGET_FILES < <(
+      find "$HERMES_DEST_DIR" -type f -name "*hermes*" \
+        ! -path "*tvos*" ! -path "*xros*" ! -path "*x86-64*" 2>/dev/null
+    )
+    
+    if [ ${#TARGET_FILES[@]} -eq 0 ]; then
+      echo "##vso[task.logissue type=error] Hermes 파일을 찾을 수 없습니다: $HERMES_DEST_DIR"
+      exit 1
+    fi
+    
+    VERIFICATION_FAILED=0
+    for TARGET_FILE in "${TARGET_FILES[@]}"; do
+      FILENAME=$(basename "$TARGET_FILE")
+      SOURCE_FILE=$(find "$APP_SEALING_SDK_DIR" -name "$FILENAME" -type f 2>/dev/null)
+      
+      if [[ -z "$SOURCE_FILE" ]]; then
+        echo "##vso[task.logissue type=error] 소스 파일 누락: $FILENAME"
+        VERIFICATION_FAILED=1
+        continue
+      fi
+      
+      if ! cmp -s "$SOURCE_FILE" "$TARGET_FILE"; then
+        echo "##vso[task.logissue type=error] 파일 불일치: $FILENAME"
+        echo "소스 해시: $(shasum "$SOURCE_FILE" | cut -d' ' -f1)"
+        echo "대상 해시: $(shasum "$TARGET_FILE" | cut -d' ' -f1)"
+        VERIFICATION_FAILED=1
+      fi
+    done
+    
+    if [ $VERIFICATION_FAILED -ne 0 ]; then
+      echo "##vso[task.logissue type=error] Hermes 파일 검증 실패. 빌드 중단!"
+      exit 1
+    fi
+    echo "=== Hermes 파일 검증 완료 ==="
+    # 🔼🔼🔼 신규 추가된 검증 코드 끝 🔼🔼🔼
+
     # 2. 아카이브 빌드
     cd ios
     xcodebuild clean archive \
