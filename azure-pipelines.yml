@@ -295,8 +295,11 @@ steps:
       exit 1
     fi
 
-    # tvOS 및 기타 불필요한 파일 제외하고 Hermes 파일 검색
-    EXISTING_HERMES_FILES=$(find "$HERMES_DEST_DIR" -type f -name "*hermes*" ! -path "*tvos*" ! -path "*xros*" ! -path "*x86-64*" 2>/dev/null)
+    # tvOS, xros, x86_64 제외하고 Hermes 파일 검색
+    EXISTING_HERMES_FILES=$(find "$HERMES_DEST_DIR" -type f -name "*hermes*" \
+      ! -path "*tvos*" \
+      ! -path "*xros*" \
+      ! -path "*x86_64*" 2>/dev/null)
 
     if [ -n "$EXISTING_HERMES_FILES" ]; then
       echo "🔍 발견된 Hermes 파일:"
@@ -312,9 +315,6 @@ steps:
         fi
       done
       echo "✅ Hermes 파일 교체 완료!"
-      # Hermes 경로 저장
-      echo "✅ Hermes 파일 교체 완료!"
-      echo "##vso[task.setvariable variable=HERMES_FILES_PATH]$EXISTING_HERMES_FILES"
     else
       echo "⚠️  대상 디렉토리에 Hermes 파일이 존재하지 않음"
     fi
@@ -377,7 +377,7 @@ steps:
     else
       echo "✅ 모든 Hermes 파일이 성공적으로 검증되었습니다."
     fi
-        
+
     # 2. 아카이브 빌드
     cd ios
     xcodebuild clean archive \
