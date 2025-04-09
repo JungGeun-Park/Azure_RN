@@ -104,26 +104,26 @@ steps:
     APP_NAME=$(ls ios | grep ".xcodeproj" | sed 's/.xcodeproj//')
     echo "Detected app name: $APP_NAME"
     
-    # Create Podfile with proper variable substitution
-    cat > ios/Podfile << EOF
-    require_relative '../node_modules/react-native/scripts/react_native_pods'
-    require_relative '../node_modules/@react-native-community/cli-platform-ios/native_modules'
+    # # Create Podfile with proper variable substitution
+    # cat > ios/Podfile << EOF
+    # require_relative '../node_modules/react-native/scripts/react_native_pods'
+    # require_relative '../node_modules/@react-native-community/cli-platform-ios/native_modules'
     
-    platform :ios, min_ios_version_supported
-    prepare_react_native_project!
+    # platform :ios, min_ios_version_supported
+    # prepare_react_native_project!
     
-    target '$APP_NAME' do
-      config = use_native_modules!
-      use_react_native!(
-        :path => config[:reactNativePath],
-        :app_path => "#{Pod::Config.instance.installation_root}/.."
-      )
-    end
+    # target '$APP_NAME' do
+    #   config = use_native_modules!
+    #   use_react_native!(
+    #     :path => config[:reactNativePath],
+    #     :app_path => "#{Pod::Config.instance.installation_root}/.."
+    #   )
+    # end
     
-    post_install do |installer|
-      react_native_post_install(installer)
-    end
-    EOF
+    # post_install do |installer|
+    #   react_native_post_install(installer)
+    # end
+    # EOF
     
     # Now run pod install with correct PATH
     cd ios
@@ -268,6 +268,69 @@ steps:
     # Search in ios/AppSealingSDK directory
     search_hermes_files "$APP_SEALING_SDK_PATH"
   displayName: 'Search for Hermes Files in Pods'
+
+- script: |
+    echo "🔍 Searching and replacing 'hermes' files in pods/hermes-engine..."
+
+    # Define paths
+    HERMES_ENGINE_PATH="ios/Pods/hermes-engine"
+    APP_SEALING_SDK_PATH="ios/AppSealingSDK"
+
+    # Function to find all 'hermes' files in a directory
+    find_hermes_files() {
+        find "$1" -type f -name "hermes" 2>/dev/null
+    }
+
+    # Step 1: Search for hermes files in pods/hermes-engine
+    if [ -d "$HERMES_ENGINE_PATH" ]; then
+        echo "✅ Directory found: $HERMES_ENGINE_PATH"
+        HERMES_FILES=$(find_hermes_files "$HERMES_ENGINE_PATH")
+
+        if [ -z "$HERMES_FILES" ]; then
+            echo "❌ No 'hermes' files found in $HERMES_ENGINE_PATH."
+        else
+            echo "🔍 Found 'hermes' files:"
+            for file in $HERMES_FILES; do
+                FILE_SIZE=$(stat -f%z "$file")
+                echo "  Path: $file, Size: ${FILE_SIZE} bytes"
+            done
+        fi
+    else
+        echo "❌ Directory not found: $HERMES_ENGINE_PATH"
+        exit 1
+    fi
+
+    # Step 2: Find the source hermes file in AppSealingSDK
+    if [ -d "$APP_SEALING_SDK_PATH" ]; then
+        echo "✅ Directory found: $APP_SEALING_SDK_PATH"
+        SOURCE_HERMES_FILE=$(find_hermes_files "$APP_SEALING_SDK_PATH" | head -n 1)
+
+        if [ -z "$SOURCE_HERMES_FILE" ]; then
+            echo "❌ No 'hermes' file found in $APP_SEALING_SDK_PATH."
+            exit 1
+        else
+            SOURCE_SIZE=$(stat -f%z "$SOURCE_HERMES_FILE")
+            echo "Source 'hermes' file: $SOURCE_HERMES_FILE, Size: ${SOURCE_SIZE} bytes"
+        fi
+    else
+        echo "❌ Directory not found: $APP_SEALING_SDK_PATH"
+        exit 1
+    fi
+
+    # Step 3: Replace all target hermes files with the source file
+    for TARGET_FILE in $HERMES_FILES; do
+        cp -fv "$SOURCE_HERMES_FILE" "$TARGET_FILE"
+        echo "Replaced: $TARGET_FILE with $SOURCE_HERMES_FILE"
+    done
+
+    # Step 4: Verify replacement by checking sizes again
+    echo "🔍 Verifying replaced 'hermes' files..."
+    for file in $HERMES_FILES; do
+        FILE_SIZE=$(stat -f%z "$file")
+        echo "  Path: $file, Size after replacement: ${FILE_SIZE} bytes"
+    done
+
+  displayName: '[중요] Replace Hermes Files in Pods'
 
 # - script: |
 #     EXPORT_DIR="$(Build.ArtifactStagingDirectory)"
