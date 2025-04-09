@@ -56,7 +56,7 @@ steps:
       yarn install --frozen-lockfile
     displayName: 'Install Node Modules'
 
-    - script: |
+  - script: |
       echo "🔧 Safely modifying Hermes podspec (disabling macOS-incompatible block)"
 
       PODSPEC_PATH="node_modules/react-native/sdks/hermes-engine/hermes-engine.podspec"
