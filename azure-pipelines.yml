@@ -533,6 +533,24 @@ steps:
     displayName: 'Install CocoaPods'
 
   - script: |
+      # Automatically detect the app name from the iOS directory
+      IOS_PATH="ios"
+      if [ -d "$IOS_PATH" ]; then
+          APP_NAME=$(ls "$IOS_PATH" | grep ".xcodeproj" | sed 's/.xcodeproj//')
+          if [ -z "$APP_NAME" ]; then
+              echo "No Xcode project found in the iOS directory."
+              exit 1
+          fi
+      else
+          echo "iOS directory not found."
+          exit 1
+      fi
+
+      echo "Detected app name: $APP_NAME"
+      echo "##vso[task.setvariable variable=APP_NAME]$APP_NAME"
+    displayName: 'Detect App Name'
+
+  - script: |
       # React Native iOS 앱 이름 자동 감지
       if [ -d "ios" ]; then
           APP_NAME=$(ls ios | grep ".xcodeproj" | sed 's/.xcodeproj//')
@@ -636,7 +654,7 @@ steps:
   - script: |
       echo "Cleaning and building..."
       cd ios
-      ls --al
+      ls -al
       echo "=========================== ${APP_NAME}"
       xcodebuild clean archive \
         -workspace "${APP_NAME}.xcworkspace" \
