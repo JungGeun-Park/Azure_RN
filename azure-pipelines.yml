@@ -552,7 +552,7 @@ steps:
 
       echo "🧪 podspec Ruby 문법 검사"
       ruby -c "$PODSPEC_PATH"
-    displayName: '[Hermes] Podspec 안전 수정'
+    displayName: '[Hermes] Podspec 수정'
 
   - script: |
       echo "Installing dependencies..."
