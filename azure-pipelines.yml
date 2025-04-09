@@ -88,7 +88,7 @@ steps:
 
 - script: |
     echo "🔧 Hermes podspec 수정 (macOS 호환 및 디버깅)"
-    
+
     HERMES_PODSPEC=node_modules/react-native/sdks/hermes-engine/hermes-engine.podspec
     BACKUP_PODSPEC=$HERMES_PODSPEC.bak
     PATCHED_PODSPEC=$HERMES_PODSPEC.patched
@@ -126,19 +126,22 @@ steps:
 
       in_script {
         print "#" $0
-        if (/<<-EOS/) {
+
+        if ($0 ~ /<<[-]?EOS/) {
           in_heredoc = 1
-        } else if (in_heredoc && /^[[:space:]]*EOS[[:space:]]*$/) {
-          print "#" $0
-          in_heredoc = 0
-          in_script = 0
           next
         }
 
-        if (in_heredoc || /^\][[:space:]]*$/ || /^end$/) {
+        if (in_heredoc) {
           print "#" $0
-          if (!in_heredoc) in_script = 0
+          if ($0 ~ /^[[:space:]]*EOS[[:space:]]*$/) {
+            in_heredoc = 0
+          }
           next
+        }
+
+        if ($0 ~ /^\][[:space:]]*$/ || $0 ~ /^[[:space:]]*end[[:space:]]*$/) {
+          in_script = 0
         }
 
         next
@@ -160,7 +163,7 @@ steps:
 
     echo "✅ Hermes podspec 수정 완료!"
 
-  displayName: '[Hermes] Podspec 수정 (디버깅 포함)'
+  displayName: '[Hermes] Podspec 수정 (heredoc 대응 포함)'
 
 - script: |
     export GEM_HOME=$HOME/.gem
