@@ -234,28 +234,39 @@ steps:
   displayName: 'Extract Bundle ID from React Native iOS Project'
 
 - script: |
-    echo "🔍 Searching for 'hermes' files in pods/hermes-engine directory..."
+    echo "🔍 Searching for 'hermes' files in pods/hermes-engine and ios/AppSealingSDK directories..."
 
-    # Define the path to the hermes-engine directory
+    # Define paths
     HERMES_ENGINE_PATH="ios/Pods/hermes-engine"
+    APP_SEALING_SDK_PATH="ios/AppSealingSDK"
 
-    # Check if the directory exists
-    if [ -d "$HERMES_ENGINE_PATH" ]; then
-        echo "✅ Directory found: $HERMES_ENGINE_PATH"
-
-        # Search for files named exactly "hermes"
-        HERMES_FILES=$(find "$HERMES_ENGINE_PATH" -type f -name "hermes")
-
-        # Output the results
-        if [ -z "$HERMES_FILES" ]; then
-            echo "❌ No 'hermes' files found in $HERMES_ENGINE_PATH"
+    # Function to search for hermes files and output path and size
+    search_hermes_files() {
+        local dir_path=$1
+        if [ -d "$dir_path" ]; then
+            echo "✅ Directory found: $dir_path"
+            HERMES_FILES=$(find "$dir_path" -type f -name "hermes")
+            
+            if [ -z "$HERMES_FILES" ]; then
+                echo "❌ No 'hermes' files found in $dir_path"
+            else
+                echo "🔍 Found 'hermes' files:"
+                for file in $HERMES_FILES; do
+                    FILE_SIZE=$(stat -f%z "$file")
+                    echo "  Path: $file"
+                    echo "  Size: ${FILE_SIZE} bytes"
+                done
+            fi
         else
-            echo "🔍 Found 'hermes' files:"
-            echo "$HERMES_FILES" | sed 's/^/  /'
+            echo "❌ Directory not found: $dir_path"
         fi
-    else
-        echo "❌ Directory not found: $HERMES_ENGINE_PATH"
-    fi
+    }
+
+    # Search in pods/hermes-engine directory
+    search_hermes_files "$HERMES_ENGINE_PATH"
+
+    # Search in ios/AppSealingSDK directory
+    search_hermes_files "$APP_SEALING_SDK_PATH"
   displayName: 'Search for Hermes Files in Pods'
 
 # - script: |
