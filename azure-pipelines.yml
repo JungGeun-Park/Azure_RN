@@ -87,7 +87,7 @@ steps:
   displayName: 'Reinstall Node Modules'
 
 - script: |
-    echo "##[group]🔧 Hermes podspec 수정 시작 (정확한 범위 처리)"
+    echo "##[group]🔧 Hermes podspec 수정 시작 (macOS sed 호환)"
     set -ex
 
     # 1. 경로 설정
@@ -97,22 +97,23 @@ steps:
     # 2. 원본 백업
     cp -v "$HERMES_PODSPEC" "$BACKUP_PODSPEC"
 
-    # 3. 패치 적용 (핵심 수정 부분)
+    # 3. 패치 적용 (macOS용 sed 구문)
     sed -i.bak '
     /HermesEngineSourceType::DOWNLOAD_PREBUILD_RELEASE_TARBALL/,/^end$/ {
-      /^end$/! s/^/#/  # end 줄은 주석 처리하지 않음
+      /^end$/! s/^/#/
     }
     /spec\.script_phases = \[/,/\]/ {
       s/^/#/
     }' "$HERMES_PODSPEC"
 
-    # 4. 검증
+    # 4. 문법 검증
     if ! ruby -c "$HERMES_PODSPEC" >/dev/null; then
-      echo "##vso[task.logissue type=error] 문법 오류 발생! 원복 진행..."
+      echo "##vso[task.logissue type=error] 문법 오류! 원복 진행..."
       mv -v "$BACKUP_PODSPEC" "$HERMES_PODSPEC"
       exit 1
     fi
 
+    echo "✅ Podspec 수정 성공!"
     echo "##[endgroup]"
   displayName: '[Hermes] Podspec 수정 (상세 로깅)'
 
