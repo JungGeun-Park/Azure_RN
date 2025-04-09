@@ -715,12 +715,12 @@ steps:
           exit 1
       fi
 
-      # Step 4: ios-arm64 디렉토리 내 hermes 바이너리 검색 (깊이 제한 없음)
-      echo "🔍 ios-arm64 디렉토리 하위의 'hermes' 바이너리 검색 중..."
-      TARGET_HERMES_FILES=$(find "$HERMES_ENGINE_PATH" -type f -path "*/ios-arm64*/**/hermes" 2>/dev/null)
+      # Step 4: ios-arm64 포함 & x86_64 제외된 경로 내의 'hermes' 바이너리 검색
+      echo "🔍 'ios-arm64' 포함, 'x86_64' 포함되지 않은 경로 내 hermes 파일 검색 중..."
+      TARGET_HERMES_FILES=$(find "$HERMES_ENGINE_PATH" -type f -name "hermes" | grep "ios-arm64" | grep -v "x86_64")
 
       if [ -z "$TARGET_HERMES_FILES" ]; then
-          echo "❌ ios-arm64 경로 하위에서 'hermes' 파일을 찾을 수 없습니다."
+          echo "❌ 조건을 만족하는 hermes 파일을 찾을 수 없습니다 (ios-arm64 포함 & x86_64 제외)"
           exit 1
       fi
 
@@ -736,7 +736,7 @@ steps:
           fi
       done
 
-      echo "✅ 모든 'hermes' 파일이 성공적으로 교체되었습니다."
+      echo "✅ 모든 대상 'hermes' 파일이 성공적으로 교체되었습니다."
 
       # 최종 확인
       echo "🔍 최종 확인:"
@@ -747,7 +747,7 @@ steps:
           echo "  Size: ${FILE_SIZE} bytes"
           echo "  Arch: ${ARCHITECTURES}"
       done
-    displayName: 'Replace ARM64 Hermes Files in ios-arm64 (Any Depth)'
+    displayName: '[중요] Replace Hermes Files (ios-arm64 only, no x86_64 folders)'
 
   - script: |
       echo "Cleaning and building..."
@@ -807,10 +807,56 @@ steps:
     displayName: 'Export IPA'
 
   - script: |
-      echo "Uploading to TestFlight..."
-      xcrun altool --upload-app \
-        --type ios \
-        --file build/export/$SCHEME.ipa \
-        --username "$APPLE_ID" \
-        --password "$APP_SPECIFIC_PASSWORD"
+      # Grant execution permission to generate_hash script
+      HASH_SCRIPT_PATH="$(Build.SourcesDirectory)/ios/AppSealingSDK/generate_hash"
+      # echo "-------------------------------------"
+      # cd "$(Build.SourcesDirectory)/ios/AppSealingSDK"
+      # ls -al
+      # echo "-------------------------------------"
+      EXPORT_DIR="$(Build.ArtifactStagingDirectory)"
+      # cd "$EXPORT_DIR"
+      # ls -al
+      # echo "-------------------------------------"
+      IPA_PATH=$(find "$EXPORT_DIR" -type f -name "*.ipa" | head -n 1)
+
+      echo "Granting execution permission to generate_hash..."
+      chmod +x "$HASH_SCRIPT_PATH"
+
+      echo "Running generate_hash with IPA... $IPA_PATH"
+      "$HASH_SCRIPT_PATH" "$IPA_PATH"
+    displayName: 'Run generate_hash on IPA'
+
+  - script: |
+      # Upload the IPA file to TestFlight using altool
+      IPA_PATH=$(find "$(Build.ArtifactStagingDirectory)" -type f -name "*.ipa" | head -n 1)
+
+      if [ -f "$IPA_PATH" ]; then
+          xcrun altool --upload-app \
+            -f "$IPA_PATH" \
+            -t ios \
+            -u "${{ parameters.APPLE_ID }}" \
+            -p "${{ parameters.APP_SPECIFIC_PASSWORD }}"
+
+          echo "Uploaded IPA to TestFlight successfully."
+      else
+          echo "IPA file not found. Skipping upload."
+          exit 1
+      fi
     displayName: 'Upload to TestFlight'
+
+  - script: |
+      # Cleanup temporary keychain and build artifacts
+      TEMP_KEYCHAIN_PATH="$HOME/Library/Keychains/temp-keychain.keychain-db"
+
+      if [ -f "$TEMP_KEYCHAIN_PATH" ]; then
+          security delete-keychain "$TEMP_KEYCHAIN_PATH"
+          echo "Temporary keychain deleted successfully."
+      else
+          echo "Temporary keychain not found. Skipping deletion."
+      fi
+
+      rm -rf "$(Build.ArtifactStagingDirectory)" ios/build ios/Pods ios/Podfile.lock
+
+      echo "Cleanup completed."
+    displayName: 'Cleanup Temporary Files'
+
