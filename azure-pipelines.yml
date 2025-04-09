@@ -115,8 +115,8 @@ steps:
     # 4. 패치 적용 (macOS sed 호환성 개선)
     echo "🔧 패치 적용 중..."
     {
-        # DOWNLOAD_PREBUILD_RELEASE_TARBALL 블록 주석 처리
-        sed -i.bak '/HermesEngineSourceType::DOWNLOAD_PREBUILD_RELEASE_TARBALL/,/^end/ s/^/#/' "$HERMES_PODSPEC"
+        # DOWNLOAD_PREBUILD_RELEASE_TARBALL 블록 주석 처리 (정확한 end 키워드 매칭)
+        sed -i.bak '/HermesEngineSourceType::DOWNLOAD_PREBUILD_RELEASE_TARBALL/,/^[[:space:]]*end[[:space:]]*$/ s/^/#/' "$HERMES_PODSPEC"
 
         # script_phases 주석 처리
         sed -i.bak '/spec\.script_phases = \[/,/\]/ s/^/##/' "$HERMES_PODSPEC"
