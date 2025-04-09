@@ -11,7 +11,6 @@
 		13B07FBF1A68108700A75B9A /* Images.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 13B07FB51A68108700A75B9A /* Images.xcassets */; };
 		25869E8A2DA3AA910097A243 /* AppSealingiOS.mm in Sources */ = {isa = PBXBuildFile; fileRef = 25869E892DA3AA910097A243 /* AppSealingiOS.mm */; };
 		25869E8B2DA3AA910097A243 /* appsealing.lic in Resources */ = {isa = PBXBuildFile; fileRef = 25869E872DA3AA910097A243 /* appsealing.lic */; };
-		25869E8F2DA4E7190097A243 /* libStaticAppSec.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 25869E8D2DA4C4020097A243 /* libStaticAppSec.a */; };
 		59D561D398CB18F5D3E34135 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 13B07FB81A68108700A75B9A /* PrivacyInfo.xcprivacy */; };
 		761780ED2CA45674006654EE /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 761780EC2CA45674006654EE /* AppDelegate.swift */; };
 		81AB9BB82411601600AC10FF /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 81AB9BB72411601600AC10FF /* LaunchScreen.storyboard */; };
@@ -40,7 +39,6 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				25869E8F2DA4E7190097A243 /* libStaticAppSec.a in Frameworks */,
 				0C80B921A6F3F58F76C31292 /* libPods-Azure_RN078.a in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -275,11 +273,10 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CLANG_ENABLE_MODULES = YES;
-				"CODE_SIGN_IDENTITY[sdk=iphoneos*]" = "iPhone Distribution";
-				CODE_SIGN_STYLE = Manual;
+				CODE_SIGN_IDENTITY = "Apple Development";
+				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = "";
-				"DEVELOPMENT_TEAM[sdk=iphoneos*]" = 22X77ENQ2H;
+				DEVELOPMENT_TEAM = 22X77ENQ2H;
 				ENABLE_BITCODE = NO;
 				INFOPLIST_FILE = Azure_RN078/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 15.1;
@@ -300,7 +297,6 @@
 				PRODUCT_BUNDLE_IDENTIFIER = com.inka.MyRnApp;
 				PRODUCT_NAME = Azure_RN078;
 				PROVISIONING_PROFILE_SPECIFIER = "";
-				"PROVISIONING_PROFILE_SPECIFIER[sdk=iphoneos*]" = "AppSealing Wildcard Distribution Profile";
 				SWIFT_OBJC_BRIDGING_HEADER = "Azure_RN078-Bridging-Header.h";
 				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
 				SWIFT_VERSION = 5.0;
@@ -314,11 +310,10 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CLANG_ENABLE_MODULES = YES;
-				"CODE_SIGN_IDENTITY[sdk=iphoneos*]" = "iPhone Distribution";
-				CODE_SIGN_STYLE = Manual;
+				CODE_SIGN_IDENTITY = "Apple Development";
+				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = "";
-				"DEVELOPMENT_TEAM[sdk=iphoneos*]" = 22X77ENQ2H;
+				DEVELOPMENT_TEAM = 22X77ENQ2H;
 				INFOPLIST_FILE = Azure_RN078/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 15.1;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -338,7 +333,6 @@
 				PRODUCT_BUNDLE_IDENTIFIER = com.inka.MyRnApp;
 				PRODUCT_NAME = Azure_RN078;
 				PROVISIONING_PROFILE_SPECIFIER = "";
-				"PROVISIONING_PROFILE_SPECIFIER[sdk=iphoneos*]" = "AppSealing Wildcard Distribution Profile";
 				SWIFT_OBJC_BRIDGING_HEADER = "Azure_RN078-Bridging-Header.h";
 				SWIFT_VERSION = 5.0;
 				VERSIONING_SYSTEM = "apple-generic";
