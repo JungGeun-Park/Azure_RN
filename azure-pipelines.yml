@@ -332,86 +332,86 @@ steps:
 
   displayName: '[중요] Replace Hermes Files in Pods'
 
-# - script: |
-#     EXPORT_DIR="$(Build.ArtifactStagingDirectory)"
-#     mkdir -p "$EXPORT_DIR"
+- script: |
+    EXPORT_DIR="$(Build.ArtifactStagingDirectory)"
+    mkdir -p "$EXPORT_DIR"
     
-#     cat << EOF > "$EXPORT_DIR/ExportOptions.plist"
-#     <?xml version="1.0" encoding="UTF-8"?>
-#     <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-#     <plist version="1.0">
-#     <dict>
-#         <key>method</key>
-#         <string>app-store</string>
-#         <key>teamID</key>
-#         <string>${{ parameters.TEAM_ID }}</string>
-#         <key>provisioningProfiles</key>
-#         <dict>
-#             <key>$BUNDLE_ID</key>
-#             <string>${{ parameters.PROVISIONING_PROFILE_NAME }}</string>
-#         </dict>
-#     </dict>
-#     </plist>
-#     EOF
+    cat << EOF > "$EXPORT_DIR/ExportOptions.plist"
+    <?xml version="1.0" encoding="UTF-8"?>
+    <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+    <plist version="1.0">
+    <dict>
+        <key>method</key>
+        <string>app-store</string>
+        <key>teamID</key>
+        <string>${{ parameters.TEAM_ID }}</string>
+        <key>provisioningProfiles</key>
+        <dict>
+            <key>$BUNDLE_ID</key>
+            <string>${{ parameters.PROVISIONING_PROFILE_NAME }}</string>
+        </dict>
+    </dict>
+    </plist>
+    EOF
     
-#     echo "ExportOptions.plist created with provisioningProfiles and bundle ID."
-#     cat "$EXPORT_DIR/ExportOptions.plist"  # Output the created plist content for debugging
+    echo "ExportOptions.plist created with provisioningProfiles and bundle ID."
+    cat "$EXPORT_DIR/ExportOptions.plist"  # Output the created plist content for debugging
 
-#   displayName: 'Generate ExportOptions.plist'
+  displayName: 'Generate ExportOptions.plist'
 
-# - script: |
-#     echo "Creating Bridging Header..."
-#     cat > ios/Azure_RN078-Bridging-Header.h << 'EOF'
-#     #import <React/RCTBridgeModule.h>
-#     #import <React/RCTBridge.h>
-#     #import <React/RCTEventDispatcher.h>
-#     #import <React/RCTRootView.h>
-#     #import <React/RCTUtils.h>
-#     #import <React/RCTConvert.h>
-#     #import <React/RCTBundleURLProvider.h>
-#     EOF
+- script: |
+    echo "Creating Bridging Header..."
+    cat > ios/Azure_RN078-Bridging-Header.h << 'EOF'
+    #import <React/RCTBridgeModule.h>
+    #import <React/RCTBridge.h>
+    #import <React/RCTEventDispatcher.h>
+    #import <React/RCTRootView.h>
+    #import <React/RCTUtils.h>
+    #import <React/RCTConvert.h>
+    #import <React/RCTBundleURLProvider.h>
+    EOF
     
-#     echo "Updating project file with sed instead of plutil..."
-#     cd ios
-#     sed -i '' 's|SWIFT_OBJC_BRIDGING_HEADER = .*;|SWIFT_OBJC_BRIDGING_HEADER = "Azure_RN078-Bridging-Header.h";|g' Azure_RN078.xcodeproj/project.pbxproj || echo "Sed command failed, will use direct reference in build command instead"
-#     cd ..
-#   displayName: 'Setup Bridging Header with sed'
+    echo "Updating project file with sed instead of plutil..."
+    cd ios
+    sed -i '' 's|SWIFT_OBJC_BRIDGING_HEADER = .*;|SWIFT_OBJC_BRIDGING_HEADER = "Azure_RN078-Bridging-Header.h";|g' Azure_RN078.xcodeproj/project.pbxproj || echo "Sed command failed, will use direct reference in build command instead"
+    cd ..
+  displayName: 'Setup Bridging Header with sed'
 
-# - script: |
-#     EXPORT_DIR="$(Build.ArtifactStagingDirectory)"
-#     ARCHIVE_PATH="$EXPORT_DIR/${APP_NAME}.xcarchive"
+- script: |
+    EXPORT_DIR="$(Build.ArtifactStagingDirectory)"
+    ARCHIVE_PATH="$EXPORT_DIR/${APP_NAME}.xcarchive"
     
-#     # 1. .xcworkspace 존재 확인
-#     WORKSPACE_PATH="$(Build.SourcesDirectory)/ios/${APP_NAME}.xcworkspace"
-#     if [ ! -d "$WORKSPACE_PATH" ]; then
-#         echo "##vso[task.logissue type=error] .xcworkspace not found: $WORKSPACE_PATH"
-#         exit 1
-#     fi
+    # 1. .xcworkspace 존재 확인
+    WORKSPACE_PATH="$(Build.SourcesDirectory)/ios/${APP_NAME}.xcworkspace"
+    if [ ! -d "$WORKSPACE_PATH" ]; then
+        echo "##vso[task.logissue type=error] .xcworkspace not found: $WORKSPACE_PATH"
+        exit 1
+    fi
 
-#     # 2. 아카이브 빌드
-#     cd ios
-#     xcodebuild clean archive \
-#       -workspace "${APP_NAME}.xcworkspace" \
-#       -scheme "${APP_NAME}" \
-#       -sdk iphoneos \
-#       -configuration Release \
-#       clean archive \
-#       CODE_SIGN_IDENTITY="Apple Distribution" \
-#       CODE_SIGN_STYLE="Manual" \
-#       CODE_SIGN_IDENTITY="Apple Distribution" \
-#       DEVELOPMENT_TEAM="${{ parameters.TEAM_ID }}" \
-#       PROVISIONING_PROFILE_SPECIFIER="${{ parameters.PROVISIONING_PROFILE_NAME }}" \
-#       SWIFT_OBJC_BRIDGING_HEADER="Azure_RN078-Bridging-Header.h" \
-#       -archivePath "$(Build.ArtifactStagingDirectory)/${APP_NAME}.xcarchive"
+    # 2. 아카이브 빌드
+    cd ios
+    xcodebuild clean archive \
+      -workspace "${APP_NAME}.xcworkspace" \
+      -scheme "${APP_NAME}" \
+      -sdk iphoneos \
+      -configuration Release \
+      clean archive \
+      CODE_SIGN_IDENTITY="Apple Distribution" \
+      CODE_SIGN_STYLE="Manual" \
+      CODE_SIGN_IDENTITY="Apple Distribution" \
+      DEVELOPMENT_TEAM="${{ parameters.TEAM_ID }}" \
+      PROVISIONING_PROFILE_SPECIFIER="${{ parameters.PROVISIONING_PROFILE_NAME }}" \
+      SWIFT_OBJC_BRIDGING_HEADER="Azure_RN078-Bridging-Header.h" \
+      -archivePath "$(Build.ArtifactStagingDirectory)/${APP_NAME}.xcarchive"
 
-#     # 3. IPA 내보내기
-#     xcodebuild -exportArchive \
-#       -archivePath "$ARCHIVE_PATH" \
-#       -exportOptionsPlist "$EXPORT_DIR/ExportOptions.plist" \
-#       -exportPath "$EXPORT_DIR"
+    # 3. IPA 내보내기
+    xcodebuild -exportArchive \
+      -archivePath "$ARCHIVE_PATH" \
+      -exportOptionsPlist "$EXPORT_DIR/ExportOptions.plist" \
+      -exportPath "$EXPORT_DIR"
     
-#     echo "IPA exported to: $EXPORT_DIR"
-#   displayName: 'Build and Export IPA'
+    echo "IPA exported to: $EXPORT_DIR"
+  displayName: 'Build and Export IPA'
 
 # - script: |
 #     echo "🔍 IPA 파일 내 Hermes 파일 교체 작업 시작..."
