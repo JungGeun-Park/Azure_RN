@@ -93,25 +93,32 @@ steps:
     BACKUP_PODSPEC=$HERMES_PODSPEC.bak
     PATCHED_PODSPEC=$HERMES_PODSPEC.patched
 
-    # 백업
+    echo "📦 원본 백업 중: $BACKUP_PODSPEC"
     cp -v "$HERMES_PODSPEC" "$BACKUP_PODSPEC"
 
-    # 수정
+    echo "🔧 podspec 내용 수정 중..."
+
     awk '
       BEGIN {
         in_tarball = 0
         in_script = 0
         in_heredoc = 0
+        heredoc_indent = ""
+        line_num = 0
+      }
+
+      {
+        line_num++
       }
 
       /if source_type == HermesEngineSourceType::DOWNLOAD_PREBUILD_RELEASE_TARBALL/ {
         in_tarball = 1
-        print "#" $0
+        print "# (L" line_num ") " $0
         next
       }
 
       in_tarball {
-        print "#" $0
+        print "# (L" line_num ") " $0
         if (/^[[:space:]]*end[[:space:]]*$/) {
           in_tarball = 0
         }
@@ -120,20 +127,21 @@ steps:
 
       /spec\.script_phase/ || /spec\.script_phases/ {
         in_script = 1
-        print "#" $0
+        print "# (L" line_num ") " $0
         next
       }
 
       in_script {
-        print "#" $0
-
+        # Detect heredoc opening
         if ($0 ~ /<<[-]?EOS/) {
           in_heredoc = 1
-          next
+          match($0, /<<[-]?EOS/)
+          heredoc_indent = substr($0, 1, RSTART - 1)
         }
 
+        print "# (L" line_num ") " $0
+
         if (in_heredoc) {
-          print "#" $0
           if ($0 ~ /^[[:space:]]*EOS[[:space:]]*$/) {
             in_heredoc = 0
           }
@@ -143,27 +151,34 @@ steps:
         if ($0 ~ /^\][[:space:]]*$/ || $0 ~ /^[[:space:]]*end[[:space:]]*$/) {
           in_script = 0
         }
-
         next
       }
 
-      { print }
+      {
+        print $0
+      }
     ' "$HERMES_PODSPEC" > "$PATCHED_PODSPEC"
 
-    # 교체
-    mv "$PATCHED_PODSPEC" "$HERMES_PODSPEC"
+    echo "🪵 변경된 파일 내용 출력 (상위 100줄):"
+    head -n 100 "$PATCHED_PODSPEC"
 
-    # 구문 검사
-    echo "🔍 Ruby 문법 검사 시작..."
-    ruby -c "$HERMES_PODSPEC" || {
-      echo "❌ 문법 오류 발생! 원복 진행..."
+    echo "🧪 Ruby 문법 검사 시작..."
+    ruby -c "$PATCHED_PODSPEC"
+    RESULT=$?
+
+    if [ $RESULT -ne 0 ]; then
+      echo "❌ Ruby 문법 오류 발생!"
+      echo "📂 원본으로 복원 중..."
       mv -v "$BACKUP_PODSPEC" "$HERMES_PODSPEC"
+      echo "📄 오류 발생한 내용 전체 출력:"
+      cat "$PATCHED_PODSPEC"
       exit 1
-    }
+    else
+      echo "✅ 문법 검사 통과!"
+      mv "$PATCHED_PODSPEC" "$HERMES_PODSPEC"
+    fi
 
-    echo "✅ Hermes podspec 수정 완료!"
-
-  displayName: '[Hermes] Podspec 수정 (heredoc 대응 포함)'
+  displayName: '[Hermes] Podspec 수정 (디버깅 모드)'
 
 - script: |
     export GEM_HOME=$HOME/.gem
