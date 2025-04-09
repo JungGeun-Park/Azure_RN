@@ -87,6 +87,23 @@ steps:
   displayName: 'Reinstall Node Modules'
 
 - script: |
+    export GEM_HOME=$HOME/.gem
+    export PATH=$GEM_HOME/bin:$PATH
+    
+    echo "Installing CocoaPods..."
+    gem install cocoapods --user-install
+    
+    echo "CocoaPods version:"
+    export PATH=$HOME/.gem/ruby/*/bin:$PATH
+    which pod || echo "Pod not found in PATH"
+    pod --version || echo "Pod command not available"
+
+    rm -rf ios/Pods
+    rm -rf ios/Podfile.lock
+    rm -rf ios/DerivedData
+  displayName: 'Install CocoaPods'
+
+- script: |
     echo "🔧 Hermes podspec 안전하게 수정 중 (macOS 비호환 블록 비활성화)"
 
     PODSPEC_PATH="node_modules/react-native/sdks/hermes-engine/hermes-engine.podspec"
@@ -115,19 +132,6 @@ steps:
     echo "🧪 podspec Ruby 문법 검사"
     ruby -c "$PODSPEC_PATH"
   displayName: '[Hermes] Podspec 안전 수정'
-
-- script: |
-    export GEM_HOME=$HOME/.gem
-    export PATH=$GEM_HOME/bin:$PATH
-    
-    echo "Installing CocoaPods..."
-    gem install cocoapods --user-install
-    
-    echo "CocoaPods version:"
-    export PATH=$HOME/.gem/ruby/*/bin:$PATH
-    which pod || echo "Pod not found in PATH"
-    pod --version || echo "Pod command not available"
-  displayName: 'Install CocoaPods'
 
 - script: |
     # First, detect the app name correctly
