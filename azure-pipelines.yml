@@ -636,6 +636,8 @@ steps:
   - script: |
       echo "Cleaning and building..."
       cd ios
+      ls --al
+      echo "=========================== ${APP_NAME}"
       xcodebuild clean archive \
         -workspace "${APP_NAME}.xcworkspace" \
         -scheme "${APP_NAME}" \
