@@ -87,30 +87,33 @@ steps:
   displayName: 'Reinstall Node Modules'
 
 - script: |
-    echo "🔧 Hermes podspec 수정 (macOS 호환 및 디버깅)"
+    echo "🔧 Hermes podspec 안전하게 수정 중 (macOS 비호환 블록 비활성화)"
+
     PODSPEC_PATH="node_modules/react-native/sdks/hermes-engine/hermes-engine.podspec"
     BACKUP_PATH="$PODSPEC_PATH.bak"
 
-    echo "📦 원본 백업: $BACKUP_PATH"
-    cp -v "$PODSPEC_PATH" "$BACKUP_PATH"
+    cp "$PODSPEC_PATH" "$BACKUP_PATH"
 
-    echo "✍️ Ruby로 podspec 수정 중..."
     ruby -e "
       path = '$PODSPEC_PATH'
       content = File.read(path)
 
-      # DOWNLOAD_PREBUILD_RELEASE_TARBALL 블럭 주석 처리
-      content.gsub!(/(^.*if source_type == HermesEngineSourceType::DOWNLOAD_PREBUILD_RELEASE_TARBALL.*?^end\s*$)/m) do |match|
-        match.lines.map { |line| '# ' + line }.join
+      # 다운로드 타르볼 블록 비활성화
+      content.gsub!(
+        /^(\s*)if source_type == HermesEngineSourceType::DOWNLOAD_PREBUILD_RELEASE_TARBALL.*?^(\s*)end\s*$/m
+      ) do |block|
+        indent = $1 || ''
+        disabled = block.lines.map { |l| indent + '# ' + l.strip }.join("\n")
+        \"#{indent}if false # Disabled by CI patch\\n#{disabled}\\n#{indent}end\"
       end
 
       File.write(path, content)
-      puts '✅ 수정 완료!'
+      puts '✅ hermes-engine.podspec 수정 완료'
     "
 
-    echo "🧪 Ruby 문법 검사..."
+    echo "🧪 podspec Ruby 문법 검사"
     ruby -c "$PODSPEC_PATH"
-  displayName: '[Hermes] Ruby로 Podspec 인라인 수정'
+  displayName: '[Hermes] Podspec 안전 수정'
 
 - script: |
     export GEM_HOME=$HOME/.gem
