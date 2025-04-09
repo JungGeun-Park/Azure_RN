@@ -635,16 +635,20 @@ steps:
 
   - script: |
       echo "Cleaning and building..."
-      xcodebuild clean -workspace $WORKSPACE -scheme $SCHEME -configuration $CONFIGURATION
-      xcodebuild archive \
-        -workspace $WORKSPACE \
-        -scheme $SCHEME \
-        -sdk $SDK \
-        -configuration $CONFIGURATION \
-        -archivePath build/$SCHEME.xcarchive \
-        CODE_SIGN_IDENTITY="$CODE_SIGN_IDENTITY" \
-        DEVELOPMENT_TEAM=$TEAM_ID \
-        PRODUCT_BUNDLE_IDENTIFIER=$BUNDLE_ID
+      cd ios
+      xcodebuild clean archive \
+        -workspace "${APP_NAME}.xcworkspace" \
+        -scheme "${APP_NAME}" \
+        -sdk iphoneos \
+        -configuration Release \
+        clean archive \
+        CODE_SIGN_IDENTITY="Apple Distribution" \
+        CODE_SIGN_STYLE="Manual" \
+        CODE_SIGN_IDENTITY="Apple Distribution" \
+        DEVELOPMENT_TEAM="${{ parameters.TEAM_ID }}" \
+        PROVISIONING_PROFILE_SPECIFIER="${{ parameters.PROVISIONING_PROFILE_NAME }}" \
+        SWIFT_OBJC_BRIDGING_HEADER="Azure_RN078-Bridging-Header.h" \
+        -archivePath "$(Build.ArtifactStagingDirectory)/${APP_NAME}.xcarchive"
     displayName: 'Archive iOS App'
 
   - script: |
