@@ -105,7 +105,7 @@ steps:
     pod install --repo-update --verbose
     cd ..
   displayName: '[수정] Reinstall CocoaPods and Pods'
-  
+
 - script: |
     echo "🔧 Hermes podspec 안전하게 수정 중 (macOS 비호환 블록 비활성화)"
 
@@ -135,18 +135,6 @@ steps:
     echo "🧪 podspec Ruby 문법 검사"
     ruby -c "$PODSPEC_PATH"
   displayName: '[Hermes] Podspec 안전 수정'
-
-- script: |
-    # First, detect the app name correctly
-    APP_NAME=$(ls ios | grep ".xcodeproj" | sed 's/.xcodeproj//')
-    echo "Detected app name: $APP_NAME"
-    
-    # Now run pod install with correct PATH
-    cd ios
-    export GEM_HOME=$HOME/.gem
-    export PATH=$GEM_HOME/ruby/2.6.0/bin:$PATH
-    pod install --repo-update
-  displayName: 'Fix Podfile and Install Pods'
 
 - script: |
     # React Native iOS 앱 이름 자동 감지
