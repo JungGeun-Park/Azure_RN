@@ -90,31 +90,38 @@ steps:
     echo "##[group]🔧 Hermes podspec 수정 (macOS 호환)"
     set -ex
 
-    # 1. 경로 설정
     HERMES_PODSPEC="node_modules/react-native/sdks/hermes-engine/hermes-engine.podspec"
     BACKUP_PODSPEC="${HERMES_PODSPEC}.bak"
 
-    # 2. 원본 백업
     cp -v "$HERMES_PODSPEC" "$BACKUP_PODSPEC"
 
-    # 3. 임시 파일로 처리 (macOS awk 호환성 해결)
     awk '
-      /HermesEngineSourceType::DOWNLOAD_PREBUILD_RELEASE_TARBALL/ { in_block=1 }
-      in_block && /^[[:space:]]*end[[:space:]]*$/ { in_block=0 }
-      {
-        if (in_block && !/^[[:space:]]*end[[:space:]]*$/) {
-          print "#" $0
-        } else if (/spec\.script_phases = \[/ || in_script) {
-          in_script=1
-          print "#" $0
-          if (/\][[:space:]]*$/) in_script=0
-        } else {
-          print $0
-        }
+      BEGIN { in_script = 0; in_tarball_block = 0 }
+      /if source_type == HermesEngineSourceType::DOWNLOAD_PREBUILD_RELEASE_TARBALL/ {
+        print "#" $0
+        in_tarball_block = 1
+        next
       }
+      in_tarball_block {
+        if (/^ *end *$/) {
+          print "#" $0
+          in_tarball_block = 0
+        } else {
+          print "#" $0
+        }
+        next
+      }
+      /spec\.script_phase/ { in_script = 1; print "#" $0; next }
+      in_script {
+        print "#" $0
+        if (/^ *EOS *$/) {
+          in_script = 0
+        }
+        next
+      }
+      { print $0 }
     ' "$HERMES_PODSPEC" > "${HERMES_PODSPEC}.tmp" && mv "${HERMES_PODSPEC}.tmp" "$HERMES_PODSPEC"
 
-    # 4. 문법 검증
     if ! ruby -c "$HERMES_PODSPEC" >/dev/null; then
       echo "##vso[task.logissue type=error]❌ 문법 오류 발생! 원복 진행..."
       mv -v "$BACKUP_PODSPEC" "$HERMES_PODSPEC"
