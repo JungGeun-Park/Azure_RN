@@ -768,11 +768,39 @@ steps:
     displayName: 'Archive iOS App'
 
   - script: |
+      EXPORT_DIR="$(Build.ArtifactStagingDirectory)"
+      mkdir -p "$EXPORT_DIR"
+      
+      cat << EOF > "$EXPORT_DIR/ExportOptions.plist"
+      <?xml version="1.0" encoding="UTF-8"?>
+      <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+      <plist version="1.0">
+      <dict>
+          <key>method</key>
+          <string>app-store</string>
+          <key>teamID</key>
+          <string>${{ parameters.TEAM_ID }}</string>
+          <key>provisioningProfiles</key>
+          <dict>
+              <key>$BUNDLE_ID</key>
+              <string>${{ parameters.PROVISIONING_PROFILE_NAME }}</string>
+          </dict>
+      </dict>
+      </plist>
+      EOF
+      
+      echo "ExportOptions.plist created with provisioningProfiles and bundle ID."
+      cat "$EXPORT_DIR/ExportOptions.plist"  # Output the created plist content for debugging
+
+    displayName: 'Generate ExportOptions.plist'
+
+  - script: |
       echo "Exporting .ipa..."
       xcodebuild -exportArchive \
-        -archivePath build/$SCHEME.xcarchive \
-        -exportOptionsPlist $EXPORT_OPTIONS_PLIST \
-        -exportPath build/export
+        -archivePath "$ARCHIVE_PATH" \
+        -exportOptionsPlist "$EXPORT_DIR/ExportOptions.plist" \
+        -exportPath "$EXPORT_DIR"
+
     displayName: 'Export IPA'
 
   - script: |
