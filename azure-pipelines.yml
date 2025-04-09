@@ -715,12 +715,12 @@ steps:
           exit 1
       fi
 
-      # Step 4: Pods 내부 'hermes' 바이너리 찾기
-      echo "🔍 hermes-engine 내부의 'hermes' 바이너리 검색 중..."
-      TARGET_HERMES_FILES=$(find "$HERMES_ENGINE_PATH" -type f -name "hermes" 2>/dev/null)
+      # Step 4: ios-arm64 디렉토리 내 hermes 바이너리 검색 (깊이 제한 없음)
+      echo "🔍 ios-arm64 디렉토리 하위의 'hermes' 바이너리 검색 중..."
+      TARGET_HERMES_FILES=$(find "$HERMES_ENGINE_PATH" -type f -path "*/ios-arm64*/**/hermes" 2>/dev/null)
 
       if [ -z "$TARGET_HERMES_FILES" ]; then
-          echo "❌ hermes-engine 안에서 대체할 'hermes' 파일을 찾을 수 없습니다."
+          echo "❌ ios-arm64 경로 하위에서 'hermes' 파일을 찾을 수 없습니다."
           exit 1
       fi
 
@@ -747,7 +747,7 @@ steps:
           echo "  Size: ${FILE_SIZE} bytes"
           echo "  Arch: ${ARCHITECTURES}"
       done
-    displayName: '[중요] Replace ARM64 Hermes Files in Pods'
+    displayName: 'Replace ARM64 Hermes Files in ios-arm64 (Any Depth)'
 
   - script: |
       echo "Cleaning and building..."
@@ -795,6 +795,9 @@ steps:
     displayName: 'Generate ExportOptions.plist'
 
   - script: |
+      EXPORT_DIR="$(Build.ArtifactStagingDirectory)"
+      ARCHIVE_PATH="$EXPORT_DIR/${APP_NAME}.xcarchive"
+
       echo "Exporting .ipa..."
       xcodebuild -exportArchive \
         -archivePath "$ARCHIVE_PATH" \
