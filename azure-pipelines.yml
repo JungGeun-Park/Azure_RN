@@ -86,22 +86,22 @@ steps:
     fi
   displayName: 'Reinstall Node Modules'
 
-- script: |
-    export GEM_HOME=$HOME/.gem
-    export PATH=$GEM_HOME/bin:$PATH
+# - script: |
+#     export GEM_HOME=$HOME/.gem
+#     export PATH=$GEM_HOME/bin:$PATH
     
-    echo "Installing CocoaPods..."
-    gem install cocoapods --user-install
+#     echo "Installing CocoaPods..."
+#     gem install cocoapods --user-install
     
-    echo "CocoaPods version:"
-    export PATH=$HOME/.gem/ruby/*/bin:$PATH
-    which pod || echo "Pod not found in PATH"
-    pod --version || echo "Pod command not available"
+#     echo "CocoaPods version:"
+#     export PATH=$HOME/.gem/ruby/*/bin:$PATH
+#     which pod || echo "Pod not found in PATH"
+#     pod --version || echo "Pod command not available"
 
-    rm -rf ios/Pods
-    rm -rf ios/Podfile.lock
-    rm -rf ios/DerivedData
-  displayName: 'Install CocoaPods'
+#     rm -rf ios/Pods
+#     rm -rf ios/Podfile.lock
+#     rm -rf ios/DerivedData
+#   displayName: 'Install CocoaPods'
 
 - script: |
     echo "🔧 Hermes podspec 안전하게 수정 중 (macOS 비호환 블록 비활성화)"
@@ -137,27 +137,6 @@ steps:
     # First, detect the app name correctly
     APP_NAME=$(ls ios | grep ".xcodeproj" | sed 's/.xcodeproj//')
     echo "Detected app name: $APP_NAME"
-    
-    # # Create Podfile with proper variable substitution
-    # cat > ios/Podfile << EOF
-    # require_relative '../node_modules/react-native/scripts/react_native_pods'
-    # require_relative '../node_modules/@react-native-community/cli-platform-ios/native_modules'
-    
-    # platform :ios, min_ios_version_supported
-    # prepare_react_native_project!
-    
-    # target '$APP_NAME' do
-    #   config = use_native_modules!
-    #   use_react_native!(
-    #     :path => config[:reactNativePath],
-    #     :app_path => "#{Pod::Config.instance.installation_root}/.."
-    #   )
-    # end
-    
-    # post_install do |installer|
-    #   react_native_post_install(installer)
-    # end
-    # EOF
     
     # Now run pod install with correct PATH
     cd ios
