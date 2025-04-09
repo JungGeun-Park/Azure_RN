@@ -97,19 +97,31 @@ steps:
     cp "$HERMES_PODSPEC" "$BACKUP_PODSPEC"
     echo "✅ Podspec 백업 생성: $BACKUP_PODSPEC"
 
-    # 3. 문제되는 스크립트 섹션 주석 처리
-    sed -i '' '/if source_type == HermesEngineSourceType::DOWNLOAD_PREBUILD_RELEASE_TARBALL/,/end/ s/^/#/' "$HERMES_PODSPEC"
-    sed -i '' '/spec.script_phases = \[/,/\]/ s/^/#/' "$HERMES_PODSPEC"
+    # 3. 문제되는 스크립트 섹션 주석 처리 (Linux/macOS 호환성 개선)
+    sed -i.bak '/^if source_type == HermesEngineSourceType::DOWNLOAD_PREBUILD_RELEASE_TARBALL/,/^end$/ s/^/#/' "$HERMES_PODSPEC"
+    sed -i.bak '/^  spec.script_phases = \[/,/^  \]/ s/^/##/' "$HERMES_PODSPEC"
 
-    # 4. 파일 존재 여부 확인
-    if grep -q "DOWNLOAD_PREBUILD_RELEASE_TARBALL" "$HERMES_PODSPEC"; then
+    # 4. 수정 사항 검증 (주석 처리된 라인 확인)
+    if grep -q "^#if source_type == HermesEngineSourceType::DOWNLOAD_PREBUILD_RELEASE_TARBALL" "$HERMES_PODSPEC" && 
+       grep -q "^##  spec.script_phases = \[" "$HERMES_PODSPEC"; then
+        echo "✅ Podspec 수정 성공!"
+        
+        # 디버그: 수정된 내용 출력
+        echo "=== 수정된 Podspec 일부 ==="
+        grep -A 15 "DOWNLOAD_PREBUILD_RELEASE_TARBALL" "$HERMES_PODSPEC"
+        grep -A 10 "spec.script_phases" "$HERMES_PODSPEC"
+    else
         echo "##vso[task.logissue type=error] Podspec 수정 실패!"
+        
+        # 원본 파일 복구
+        mv "$BACKUP_PODSPEC" "$HERMES_PODSPEC"
         exit 1
     fi
 
-    echo "✅ Hermes podspec 수정 완료!"
+    # 5. 임시 백업 파일 정리
+    rm -f "${HERMES_PODSPEC}.bak"
   displayName: '[Hermes] Podspec 자동 복원 방지 패치'
-  condition: succeeded()  # 이전 단계 성공 시에만 실행
+  condition: succeeded()
 
 - script: |
     export GEM_HOME=$HOME/.gem
