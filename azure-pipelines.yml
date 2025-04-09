@@ -518,7 +518,7 @@ steps:
     inputs:
       version: '18.x'
     displayName: 'Install Node.js'
-    
+
   - script: |
       echo "Installing JS dependencies..."
       yarn install --frozen-lockfile
@@ -531,6 +531,107 @@ steps:
       cd ios
       pod install
     displayName: 'Install CocoaPods'
+
+  - script: |
+      # React Native iOS 앱 이름 자동 감지
+      if [ -d "ios" ]; then
+          APP_NAME=$(ls ios | grep ".xcodeproj" | sed 's/.xcodeproj//')
+          if [ -z "$APP_NAME" ]; then
+              echo "##vso[task.logissue type=error] iOS 디렉토리에서 Xcode 프로젝트를 찾을 수 없습니다."
+              exit 1
+          fi
+          echo "감지된 앱 이름: $APP_NAME"
+      else
+          echo "##vso[task.logissue type=error] iOS 디렉토리를 찾을 수 없습니다. React Native 프로젝트인지 확인하세요."
+          exit 1
+      fi
+      
+      # Info.plist 경로
+      INFO_PLIST_PATH="$(Build.SourcesDirectory)/ios/${APP_NAME}/Info.plist"
+      echo "Info.plist 확인 경로: $INFO_PLIST_PATH"
+
+      # 1. Info.plist에서 직접 추출 시도
+      if [ -f "$INFO_PLIST_PATH" ]; then
+          echo "Info.plist 발견. CFBundleIdentifier 추출 중..."
+          BUNDLE_ID=$(/usr/libexec/PlistBuddy -c "Print :CFBundleIdentifier" "$INFO_PLIST_PATH" 2>/dev/null)
+          
+          # 변수 값이 포함되어 있거나 빈 값인 경우 Xcode 빌드 설정에서 추출
+          if [[ "$BUNDLE_ID" == *"$"* ]] || [ -z "$BUNDLE_ID" ]; then
+              echo "변수 감지 또는 빈 값. Xcode 빌드 설정에서 PRODUCT_BUNDLE_IDENTIFIER 검색..."
+              
+              # 워크스페이스 파일 확인
+              if [ -f "ios/${APP_NAME}.xcworkspace" ]; then
+                  echo "워크스페이스 파일 사용: ios/${APP_NAME}.xcworkspace"
+                  BUNDLE_ID=$(xcodebuild -showBuildSettings \
+                              -workspace "ios/${APP_NAME}.xcworkspace" \
+                              -scheme "${APP_NAME}" \
+                              -configuration Release \
+                              -sdk iphoneos 2>/dev/null |
+                              grep -E '^\s*PRODUCT_BUNDLE_IDENTIFIER\s*=' |
+                              awk -F '=' '{print $2}' |
+                              sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')
+              else
+                  echo "프로젝트 파일 사용: ios/${APP_NAME}.xcodeproj"
+                  BUNDLE_ID=$(xcodebuild -showBuildSettings \
+                              -project "ios/${APP_NAME}.xcodeproj" \
+                              -scheme "${APP_NAME}" \
+                              -configuration Release \
+                              -sdk iphoneos 2>/dev/null |
+                              grep -E '^\s*PRODUCT_BUNDLE_IDENTIFIER\s*=' |
+                              awk -F '=' '{print $2}' |
+                              sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')
+              fi
+          fi
+      else
+          # 2. Info.plist 없을 경우 Xcode 빌드 설정에서 직접 추출
+          echo "Info.plist 없음. Xcode 빌드 설정에서 추출..."
+          
+          # 워크스페이스 파일 확인
+          if [ -f "ios/${APP_NAME}.xcworkspace" ]; then
+              echo "워크스페이스 파일 사용: ios/${APP_NAME}.xcworkspace"
+              BUNDLE_ID=$(xcodebuild -showBuildSettings \
+                          -workspace "ios/${APP_NAME}.xcworkspace" \
+                          -scheme "${APP_NAME}" \
+                          -configuration Release \
+                          -sdk iphoneos 2>/dev/null |
+                          grep -E '^\s*PRODUCT_BUNDLE_IDENTIFIER\s*=' |
+                          awk -F '=' '{print $2}' |
+                          sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')
+          else
+              echo "프로젝트 파일 사용: ios/${APP_NAME}.xcodeproj"
+              BUNDLE_ID=$(xcodebuild -showBuildSettings \
+                          -project "ios/${APP_NAME}.xcodeproj" \
+                          -scheme "${APP_NAME}" \
+                          -configuration Release \
+                          -sdk iphoneos 2>/dev/null |
+                          grep -E '^\s*PRODUCT_BUNDLE_IDENTIFIER\s*=' |
+                          awk -F '=' '{print $2}' |
+                          sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')
+          fi
+      fi
+
+      # 3. 여전히 번들 ID를 찾지 못한 경우 pbxproj 파일에서 직접 검색
+      if [ -z "$BUNDLE_ID" ]; then
+          echo "빌드 설정에서 번들 ID를 찾지 못했습니다. pbxproj 파일에서 검색..."
+          PBXPROJ_PATH="ios/${APP_NAME}.xcodeproj/project.pbxproj"
+          if [ -f "$PBXPROJ_PATH" ]; then
+              BUNDLE_ID=$(grep -A 5 "PRODUCT_BUNDLE_IDENTIFIER" "$PBXPROJ_PATH" | 
+                        grep -o '"[^"]*"' | 
+                        head -1 | 
+                        sed 's/"//g')
+          fi
+      fi
+
+      # 최종 검증
+      if [ -z "$BUNDLE_ID" ]; then
+          echo "##vso[task.logissue type=error] 번들 식별자를 찾을 수 없습니다!"
+          exit 1
+      fi
+
+      echo "추출된 BUNDLE_ID: $BUNDLE_ID"
+      echo "##vso[task.setvariable variable=BUNDLE_ID]$BUNDLE_ID"
+      echo "##vso[task.logissue type=warning] 추출된 Bundle ID: $BUNDLE_ID"
+    displayName: 'Extract Bundle ID from React Native iOS Project'
 
   - script: |
       echo "Cleaning and building..."
