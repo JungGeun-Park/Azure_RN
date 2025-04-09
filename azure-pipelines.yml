@@ -96,30 +96,40 @@ steps:
     cp -v "$HERMES_PODSPEC" "$BACKUP_PODSPEC"
 
     awk '
-      BEGIN { in_script = 0; in_tarball_block = 0 }
+      BEGIN {
+        in_tarball = 0
+        in_script = 0
+      }
+
       /if source_type == HermesEngineSourceType::DOWNLOAD_PREBUILD_RELEASE_TARBALL/ {
+        in_tarball = 1
         print "#" $0
-        in_tarball_block = 1
         next
       }
-      in_tarball_block {
-        if (/^ *end *$/) {
-          print "#" $0
-          in_tarball_block = 0
-        } else {
-          print "#" $0
+
+      in_tarball {
+        print "#" $0
+        if (/^[[:space:]]*end[[:space:]]*$/) {
+          in_tarball = 0
         }
         next
       }
-      /spec\.script_phase/ { in_script = 1; print "#" $0; next }
+
+      /spec\.script_phase/ || /spec\.script_phases/ {
+        in_script = 1
+        print "#" $0
+        next
+      }
+
       in_script {
         print "#" $0
-        if (/^ *EOS *$/) {
+        if (/EOS[[:space:]]*$/ || /^\][[:space:]]*$/) {
           in_script = 0
         }
         next
       }
-      { print $0 }
+
+      { print }
     ' "$HERMES_PODSPEC" > "${HERMES_PODSPEC}.tmp" && mv "${HERMES_PODSPEC}.tmp" "$HERMES_PODSPEC"
 
     if ! ruby -c "$HERMES_PODSPEC" >/dev/null; then
@@ -130,7 +140,7 @@ steps:
 
     echo "✅ Podspec 수정 성공! 문법 검증 완료."
     echo "##[endgroup]"
-  displayName: '[Hermes] Podspec 수정 (상세 로깅)'
+  displayName: '[Hermes] Podspec 수정 (정밀 주석 처리)'
 
 # - script: |
 #     echo "##[group]🔧 자동 Hermes 복원 방지 설정 시작..."
