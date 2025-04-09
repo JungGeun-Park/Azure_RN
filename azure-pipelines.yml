@@ -87,67 +87,32 @@ steps:
   displayName: 'Reinstall Node Modules'
 
 - script: |
-    echo "##[group]🔧 Hermes podspec 수정 시작 (상세 로깅)"
-    set -ex  # 모든 명령어 출력 활성화
+    echo "##[group]🔧 Hermes podspec 수정 시작 (정확한 범위 처리)"
+    set -ex
 
     # 1. 경로 설정
     HERMES_PODSPEC="node_modules/react-native/sdks/hermes-engine/hermes-engine.podspec"
     BACKUP_PODSPEC="${HERMES_PODSPEC}.bak"
 
-    echo "ℹ️ Podspec 파일 확인: $HERMES_PODSPEC"
-    if [ ! -f "$HERMES_PODSPEC" ]; then
-        echo "##vso[task.logissue type=error] Podspec 파일을 찾을 수 없습니다!"
-        exit 1
-    fi
-
-    # 2. 원본 내용 로깅
-    echo "📄 원본 Podspec 내용 (일부):"
-    grep -A 15 "DOWNLOAD_PREBUILD_RELEASE_TARBALL" "$HERMES_PODSPEC" | sed 's/^/  /' || true
-
-    # 3. 백업 생성
-    echo "💾 백업 생성: $BACKUP_PODSPEC"
+    # 2. 원본 백업
     cp -v "$HERMES_PODSPEC" "$BACKUP_PODSPEC"
-    if [ $? -ne 0 ]; then
-        echo "##vso[task.logissue type=error] 백업 생성에 실패했습니다!"
-        exit 1
+
+    # 3. 패치 적용 (핵심 수정 부분)
+    sed -i.bak '
+    /HermesEngineSourceType::DOWNLOAD_PREBUILD_RELEASE_TARBALL/,/^end$/ {
+      /^end$/! s/^/#/  # end 줄은 주석 처리하지 않음
+    }
+    /spec\.script_phases = \[/,/\]/ {
+      s/^/#/
+    }' "$HERMES_PODSPEC"
+
+    # 4. 검증
+    if ! ruby -c "$HERMES_PODSPEC" >/dev/null; then
+      echo "##vso[task.logissue type=error] 문법 오류 발생! 원복 진행..."
+      mv -v "$BACKUP_PODSPEC" "$HERMES_PODSPEC"
+      exit 1
     fi
 
-    # 4. 패치 적용 (macOS sed 호환성 개선)
-    echo "🔧 패치 적용 중..."
-    {
-      # DOWNLOAD_PREBUILD_RELEASE_TARBALL 블록 주석 처리 (Ruby 구문 유지)
-      sed -i.bak '/HermesEngineSourceType::DOWNLOAD_PREBUILD_RELEASE_TARBALL/,/^end$/ s/^/#/' "$HERMES_PODSPEC"
-
-      # script_phases 주석 처리 (정확한 범위 지정)
-      sed -i.bak '/spec\.script_phases = \[/,/\]/ s/^/#/' "$HERMES_PODSPEC"
-    } 2>&1 | tee sed.log
-
-    if [ $? -ne 0 ]; then
-        echo "##vso[task.logissue type=error] sed 명령 실행 중 오류가 발생했습니다!"
-        echo "🔍 sed 로그 내용:"
-        cat sed.log | sed 's/^/  /'
-        exit 1
-    fi
-
-    # 5. 수정본 내용 로깅
-    echo "📄 수정된 Podspec 내용 (일부):"
-    grep -A 15 "DOWNLOAD_PREBUILD_RELEASE_TARBALL" "$HERMES_PODSPEC" | sed 's/^/  /' || true
-
-    # 6. 검증
-    echo "🔍 검증 시작..."
-    if grep -q "^#.*DOWNLOAD_PREBUILD_RELEASE_TARBALL" "$HERMES_PODSPEC" && 
-      grep -q "^##.*spec.script_phases" "$HERMES_PODSPEC"; then
-        echo "✅ 패치 성공!"
-    else
-        echo "##vso[task.logissue type=error] 패치 실패! 변경 사항:"
-        diff -u "$BACKUP_PODSPEC" "$HERMES_PODSPEC" | sed 's/^/  /'
-        exit 1
-    fi
-
-    # 7. 임시 파일 정리
-    rm -f "${HERMES_PODSPEC}.bak"
-    rm -f sed.log
-    echo "🧹 임시 파일 정리 완료."
     echo "##[endgroup]"
   displayName: '[Hermes] Podspec 수정 (상세 로깅)'
 
