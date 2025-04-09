@@ -87,78 +87,79 @@ steps:
   displayName: 'Reinstall Node Modules'
 
 - script: |
-    echo "##[group]🔧 Hermes podspec 수정 (macOS 호환 + 디버깅)"
-    set -ex
+    echo "🔧 Hermes podspec 수정 (macOS 호환 및 디버깅)"
+    
+    HERMES_PODSPEC=node_modules/react-native/sdks/hermes-engine/hermes-engine.podspec
+    BACKUP_PODSPEC=$HERMES_PODSPEC.bak
+    PATCHED_PODSPEC=$HERMES_PODSPEC.patched
 
-    HERMES_PODSPEC="node_modules/react-native/sdks/hermes-engine/hermes-engine.podspec"
-    BACKUP_PODSPEC="${HERMES_PODSPEC}.bak"
-    PATCHED_PODSPEC="${HERMES_PODSPEC}.patched"
-
+    # 백업
     cp -v "$HERMES_PODSPEC" "$BACKUP_PODSPEC"
 
+    # 수정
     awk '
       BEGIN {
         in_tarball = 0
         in_script = 0
-        line_num = 0
-      }
-
-      {
-        line_num++
+        in_heredoc = 0
       }
 
       /if source_type == HermesEngineSourceType::DOWNLOAD_PREBUILD_RELEASE_TARBALL/ {
         in_tarball = 1
-        print "# [line " line_num "] TAR_START: " $0
-        print "# [TAR_LOG] -> 주석 시작 (tarball)" > "/dev/stderr"
+        print "#" $0
         next
       }
 
       in_tarball {
-        print "# [line " line_num "] " $0
-        print "# [TAR_LOG] " $0 > "/dev/stderr"
+        print "#" $0
         if (/^[[:space:]]*end[[:space:]]*$/) {
           in_tarball = 0
-          print "# [TAR_LOG] -> 주석 종료 (tarball)" > "/dev/stderr"
         }
         next
       }
 
       /spec\.script_phase/ || /spec\.script_phases/ {
         in_script = 1
-        print "# [line " line_num "] SCRIPT_START: " $0
-        print "# [SCRIPT_LOG] -> 주석 시작 (script)" > "/dev/stderr"
+        print "#" $0
         next
       }
 
       in_script {
-        print "# [line " line_num "] " $0
-        print "# [SCRIPT_LOG] " $0 > "/dev/stderr"
-        if (/EOS[[:space:]]*$/ || /^\][[:space:]]*$/) {
+        print "#" $0
+        if (/<<-EOS/) {
+          in_heredoc = 1
+        } else if (in_heredoc && /^[[:space:]]*EOS[[:space:]]*$/) {
+          print "#" $0
+          in_heredoc = 0
           in_script = 0
-          print "# [SCRIPT_LOG] -> 주석 종료 (script)" > "/dev/stderr"
+          next
         }
+
+        if (in_heredoc || /^\][[:space:]]*$/ || /^end$/) {
+          print "#" $0
+          if (!in_heredoc) in_script = 0
+          next
+        }
+
         next
       }
 
-      {
-        print $0
-      }
+      { print }
     ' "$HERMES_PODSPEC" > "$PATCHED_PODSPEC"
 
-    echo "🔍 Patched 파일 preview:"
-    tail -n 30 "$PATCHED_PODSPEC"
-
+    # 교체
     mv "$PATCHED_PODSPEC" "$HERMES_PODSPEC"
 
-    if ! ruby -c "$HERMES_PODSPEC" >/dev/null; then
-      echo "##vso[task.logissue type=error]❌ 문법 오류 발생! 원복 진행..."
+    # 구문 검사
+    echo "🔍 Ruby 문법 검사 시작..."
+    ruby -c "$HERMES_PODSPEC" || {
+      echo "❌ 문법 오류 발생! 원복 진행..."
       mv -v "$BACKUP_PODSPEC" "$HERMES_PODSPEC"
       exit 1
-    fi
+    }
 
-    echo "✅ Podspec 수정 성공! 문법 검증 완료."
-    echo "##[endgroup]"
+    echo "✅ Hermes podspec 수정 완료!"
+
   displayName: '[Hermes] Podspec 수정 (디버깅 포함)'
 
 - script: |
