@@ -102,8 +102,9 @@ steps:
       content.gsub!(
         /^(\s*)if source_type == HermesEngineSourceType::DOWNLOAD_PREBUILD_RELEASE_TARBALL.*?^(\s*)end\s*$/m
       ) do |block|
-        indent = $1 || ''
-        disabled = block.lines.map { |l| indent + '# ' + l.strip }.join("\n")
+        match = block.match(/^(\s*)/)
+        indent = match ? match[1] : ''
+        disabled = block.lines.map { |l| indent + '# ' + l.strip }.join(\"\\n\")
         \"#{indent}if false # Disabled by CI patch\\n#{disabled}\\n#{indent}end\"
       end
 
