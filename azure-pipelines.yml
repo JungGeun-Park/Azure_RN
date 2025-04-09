@@ -87,77 +87,106 @@ steps:
   displayName: 'Reinstall Node Modules'
 
 - script: |
-    echo "##[group]🔧 자동 Hermes 복원 방지 설정 시작..."
-    set -x  # 명령어 추적 활성화
+    echo "##[group]🔧 Hermes 자동 복원 방지 패치 (React Native 0.72+ 대응)"
+    set -x
 
-    # 1. Hermes podspec 파일 경로 설정
     HERMES_PODSPEC="node_modules/react-native/sdks/hermes-engine/hermes-engine.podspec"
     BACKUP_PODSPEC="${HERMES_PODSPEC}.bak"
 
-    # 2. 파일 존재 여부 확인
-    echo "##[debug] Checking podspec existence..."
-    if [ ! -f "$HERMES_PODSPEC" ]; then
-        echo "##vso[task.logissue type=error] Podspec 파일을 찾을 수 없음: $HERMES_PODSPEC"
-        exit 1
-    fi
-
-    # 3. 원본 파일 내용 출력 (디버깅용)
-    echo "##[debug] Original podspec head:"
-    head -n 50 "$HERMES_PODSPEC" | sed 's/^/  /'
-
-    # 4. 기존 podspec 백업
-    echo "##[debug] Creating backup..."
+    # 1. 백업 생성
     cp -v "$HERMES_PODSPEC" "$BACKUP_PODSPEC"
 
-    # 5. 패치 적용 (macOS/Linux 호환성 개선)
-    echo "##[debug] Applying patches..."
-    {
-        # 첫 번째 패치: DOWNLOAD_PREBUILD_RELEASE_TARBALL 블록 주석 처리
-        sed -i'.patch1' '/^if source_type == HermesEngineSourceType::DOWNLOAD_PREBUILD_RELEASE_TARBALL/,/^end$/ s/^/#/' "$HERMES_PODSPEC"
-        PATCH1_EXIT=$?
-        echo "##[debug] Patch 1 exit code: $PATCH1_EXIT"
+    # 2. 패치 적용 (최신 React Native 구조 반영)
+    sed -i.bak '
+      /HermesEngineSourceType::DOWNLOAD_PREBUILD_RELEASE_TARBALL/,/end/ s/^/#/
+      /spec\.script_phases = \[/,/\]/ s/^/##/
+    ' "$HERMES_PODSPEC"
 
-        # 두 번째 패치: script_phases 블록 주석 처리
-        sed -i'.patch2' '/^  spec.script_phases = \[/,/^  \]/ s/^/##/' "$HERMES_PODSPEC"
-        PATCH2_EXIT=$?
-        echo "##[debug] Patch 2 exit code: $PATCH2_EXIT"
-    } 2>&1 | sed 's/^/  /'  # 모든 에러 출력에 들여쓰기 추가
-
-    # 6. 패치 결과 검증
-    echo "##[debug] Verifying patches..."
-    grep -q "^#if source_type == HermesEngineSourceType::DOWNLOAD_PREBUILD_RELEASE_TARBALL" "$HERMES_PODSPEC"
-    GREP1_EXIT=$?
-    grep -q "^##  spec.script_phases = \[" "$HERMES_PODSPEC"
-    GREP2_EXIT=$?
-
-    echo "##[debug] Grep results: $GREP1_EXIT, $GREP2_EXIT"
-
-    # 7. 종합 검증
-    if [ $PATCH1_EXIT -ne 0 ] || [ $PATCH2_EXIT -ne 0 ] || [ $GREP1_EXIT -ne 0 ] || [ $GREP2_EXIT -ne 0 ]; then
-        echo "##vso[task.logissue type=error] 패치 적용 실패!"
-        
-        # 실패 시 diff 출력
-        echo "##[debug] Diff between original and patched:"
+    # 3. 검증 로직 개선
+    if grep -q "DOWNLOAD_PREBUILD_RELEASE_TARBALL" "$HERMES_PODSPEC" || 
+       grep -q "spec.script_phases" "$HERMES_PODSPEC"; then
+        echo "##[error] 패치 실패! 수동 검토 필요"
         diff -u "$BACKUP_PODSPEC" "$HERMES_PODSPEC" | sed 's/^/  /'
-        
-        # 원본 복구
-        mv -v "$BACKUP_PODSPEC" "$HERMES_PODSPEC"
         exit 1
-    else
-        echo "##[debug] 패치 적용 성공!"
-        
-        # 성공 시 수정된 내용 출력
-        echo "##[debug] Modified podspec head:"
-        head -n 50 "$HERMES_PODSPEC" | grep -E '^(#|  spec)' | sed 's/^/  /'
-        
-        # 임시 백업 파일 정리
-        rm -f "${HERMES_PODSPEC}.patch1" "${HERMES_PODSPEC}.patch2"
     fi
 
+    echo "##[section]✅ 패치 적용 성공!"
     set +x
     echo "##[endgroup]"
-  displayName: '[Hermes] Podspec 자동 복원 방지 패치 (디버깅 강화)'
-  condition: succeeded()
+  displayName: '[Hermes] Podspec 복원 방지 (v2)'
+
+# - script: |
+#     echo "##[group]🔧 자동 Hermes 복원 방지 설정 시작..."
+#     set -x  # 명령어 추적 활성화
+
+#     # 1. Hermes podspec 파일 경로 설정
+#     HERMES_PODSPEC="node_modules/react-native/sdks/hermes-engine/hermes-engine.podspec"
+#     BACKUP_PODSPEC="${HERMES_PODSPEC}.bak"
+
+#     # 2. 파일 존재 여부 확인
+#     echo "##[debug] Checking podspec existence..."
+#     if [ ! -f "$HERMES_PODSPEC" ]; then
+#         echo "##vso[task.logissue type=error] Podspec 파일을 찾을 수 없음: $HERMES_PODSPEC"
+#         exit 1
+#     fi
+
+#     # 3. 원본 파일 내용 출력 (디버깅용)
+#     echo "##[debug] Original podspec head:"
+#     head -n 50 "$HERMES_PODSPEC" | sed 's/^/  /'
+
+#     # 4. 기존 podspec 백업
+#     echo "##[debug] Creating backup..."
+#     cp -v "$HERMES_PODSPEC" "$BACKUP_PODSPEC"
+
+#     # 5. 패치 적용 (macOS/Linux 호환성 개선)
+#     echo "##[debug] Applying patches..."
+#     {
+#         # 첫 번째 패치: DOWNLOAD_PREBUILD_RELEASE_TARBALL 블록 주석 처리
+#         sed -i'.patch1' '/^if source_type == HermesEngineSourceType::DOWNLOAD_PREBUILD_RELEASE_TARBALL/,/^end$/ s/^/#/' "$HERMES_PODSPEC"
+#         PATCH1_EXIT=$?
+#         echo "##[debug] Patch 1 exit code: $PATCH1_EXIT"
+
+#         # 두 번째 패치: script_phases 블록 주석 처리
+#         sed -i'.patch2' '/^  spec.script_phases = \[/,/^  \]/ s/^/##/' "$HERMES_PODSPEC"
+#         PATCH2_EXIT=$?
+#         echo "##[debug] Patch 2 exit code: $PATCH2_EXIT"
+#     } 2>&1 | sed 's/^/  /'  # 모든 에러 출력에 들여쓰기 추가
+
+#     # 6. 패치 결과 검증
+#     echo "##[debug] Verifying patches..."
+#     grep -q "^#if source_type == HermesEngineSourceType::DOWNLOAD_PREBUILD_RELEASE_TARBALL" "$HERMES_PODSPEC"
+#     GREP1_EXIT=$?
+#     grep -q "^##  spec.script_phases = \[" "$HERMES_PODSPEC"
+#     GREP2_EXIT=$?
+
+#     echo "##[debug] Grep results: $GREP1_EXIT, $GREP2_EXIT"
+
+#     # 7. 종합 검증
+#     if [ $PATCH1_EXIT -ne 0 ] || [ $PATCH2_EXIT -ne 0 ] || [ $GREP1_EXIT -ne 0 ] || [ $GREP2_EXIT -ne 0 ]; then
+#         echo "##vso[task.logissue type=error] 패치 적용 실패!"
+        
+#         # 실패 시 diff 출력
+#         echo "##[debug] Diff between original and patched:"
+#         diff -u "$BACKUP_PODSPEC" "$HERMES_PODSPEC" | sed 's/^/  /'
+        
+#         # 원본 복구
+#         mv -v "$BACKUP_PODSPEC" "$HERMES_PODSPEC"
+#         exit 1
+#     else
+#         echo "##[debug] 패치 적용 성공!"
+        
+#         # 성공 시 수정된 내용 출력
+#         echo "##[debug] Modified podspec head:"
+#         head -n 50 "$HERMES_PODSPEC" | grep -E '^(#|  spec)' | sed 's/^/  /'
+        
+#         # 임시 백업 파일 정리
+#         rm -f "${HERMES_PODSPEC}.patch1" "${HERMES_PODSPEC}.patch2"
+#     fi
+
+#     set +x
+#     echo "##[endgroup]"
+#   displayName: '[Hermes] Podspec 자동 복원 방지 패치 (디버깅 강화)'
+#   condition: succeeded()
 
 - script: |
     export GEM_HOME=$HOME/.gem
