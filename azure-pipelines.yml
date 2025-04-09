@@ -37,32 +37,32 @@ steps:
 #     echo "##vso[task.setvariable variable=APP_NAME]$APP_NAME"
 #   displayName: 'Detect App Name'
 
-# - script: |
-#     # Define paths for provisioning profile and keychain setup
-#     P12_CERT_PATH="$(Build.SourcesDirectory)/ios/distribution.p12"
-#     PROVISIONING_PROFILE_PATH="$(Build.SourcesDirectory)/ios/profile.mobileprovision"
-#     KEYCHAIN_PATH="$HOME/Library/Keychains/temp-keychain.keychain-db"
-#     KEYCHAIN_PASSWORD="temp123"
+- script: |
+    # Define paths for provisioning profile and keychain setup
+    P12_CERT_PATH="$(Build.SourcesDirectory)/ios/distribution.p12"
+    PROVISIONING_PROFILE_PATH="$(Build.SourcesDirectory)/ios/profile.mobileprovision"
+    KEYCHAIN_PATH="$HOME/Library/Keychains/temp-keychain.keychain-db"
+    KEYCHAIN_PASSWORD="temp123"
 
-#     # Create a temporary keychain for code signing
-#     if security list-keychains | grep -q "temp-keychain.keychain-db"; then
-#         echo "Deleting existing temporary keychain..."
-#         security delete-keychain "$KEYCHAIN_PATH"
-#     fi
+    # Create a temporary keychain for code signing
+    if security list-keychains | grep -q "temp-keychain.keychain-db"; then
+        echo "Deleting existing temporary keychain..."
+        security delete-keychain "$KEYCHAIN_PATH"
+    fi
 
-#     echo "Creating temporary keychain..."
-#     security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+    echo "Creating temporary keychain..."
+    security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
 
-#     echo "Setting temporary keychain as default..."
-#     security list-keychains -d user -s "$KEYCHAIN_PATH"
-#     security default-keychain -s "$KEYCHAIN_PATH"
-#     security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
-#     security set-keychain-settings -lut 3600 "$KEYCHAIN_PATH"
+    echo "Setting temporary keychain as default..."
+    security list-keychains -d user -s "$KEYCHAIN_PATH"
+    security default-keychain -s "$KEYCHAIN_PATH"
+    security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+    security set-keychain-settings -lut 3600 "$KEYCHAIN_PATH"
 
-#     echo "Importing distribution certificate (PKCS#12) into temporary keychain..."
-#     security import "$P12_CERT_PATH" -k "$KEYCHAIN_PATH" -P "123456" -T /usr/bin/codesign
-#     security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
-#   displayName: 'Setup Temporary Keychain and Install Certificate'
+    echo "Importing distribution certificate (PKCS#12) into temporary keychain..."
+    security import "$P12_CERT_PATH" -k "$KEYCHAIN_PATH" -P "123456" -T /usr/bin/codesign
+    security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+  displayName: 'Setup Temporary Keychain and Install Certificate'
 
 # - task: NodeTool@0
 #   inputs:
@@ -747,7 +747,7 @@ steps:
           echo "  Size: ${FILE_SIZE} bytes"
           echo "  Arch: ${ARCHITECTURES}"
       done
-    displayName: '[중요] Replace Hermes Files (ios-arm64 only, no x86_64 folders)'
+    displayName: 'Replace Hermes Files'
 
   - script: |
       echo "Cleaning and building..."
