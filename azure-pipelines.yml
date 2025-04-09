@@ -525,6 +525,36 @@ steps:
     displayName: 'Install Node Modules'
 
   - script: |
+      echo "🔧 Hermes podspec 안전하게 수정 중 (macOS 비호환 블록 비활성화)"
+
+      PODSPEC_PATH="node_modules/react-native/sdks/hermes-engine/hermes-engine.podspec"
+      BACKUP_PATH="$PODSPEC_PATH.bak"
+
+      cp "$PODSPEC_PATH" "$BACKUP_PATH"
+
+      ruby -e "
+        path = '$PODSPEC_PATH'
+        content = File.read(path)
+
+        # 다운로드 타르볼 블록 비활성화
+        content.gsub!(
+          /^(\s*)if source_type == HermesEngineSourceType::DOWNLOAD_PREBUILD_RELEASE_TARBALL.*?^(\s*)end\s*$/m
+        ) do |block|
+          match = block.match(/^(\s*)/)
+          indent = match ? match[1] : ''
+          disabled = block.lines.map { |l| indent + '# ' + l.strip }.join(\"\\n\")
+          \"#{indent}if false # Disabled by CI patch\\n#{disabled}\\n#{indent}end\"
+        end
+
+        File.write(path, content)
+        puts '✅ hermes-engine.podspec 수정 완료'
+      "
+
+      echo "🧪 podspec Ruby 문법 검사"
+      ruby -c "$PODSPEC_PATH"
+    displayName: '[Hermes] Podspec 안전 수정'
+
+  - script: |
       echo "Installing dependencies..."
       brew install cocoapods
       gem pristine ffi --version 1.16.3
@@ -654,8 +684,6 @@ steps:
   - script: |
       echo "Cleaning and building..."
       cd ios
-      ls -al
-      echo "=========================== ${APP_NAME}"
       xcodebuild clean archive \
         -workspace "${APP_NAME}.xcworkspace" \
         -scheme "${APP_NAME}" \
