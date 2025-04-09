@@ -518,6 +518,11 @@ steps:
     inputs:
       version: '18.x'
     displayName: 'Install Node.js'
+    
+  - script: |
+      echo "Installing JS dependencies..."
+      yarn install --frozen-lockfile
+    displayName: 'Install Node Modules'
 
   - script: |
       echo "Installing dependencies..."
