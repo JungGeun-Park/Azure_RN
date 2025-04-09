@@ -19,91 +19,91 @@ parameters:
   default: 'AppSealing Wildcard Distribution Profile'
 
 steps:
-- script: |
-    # Automatically detect the app name from the iOS directory
-    IOS_PATH="ios"
-    if [ -d "$IOS_PATH" ]; then
-        APP_NAME=$(ls "$IOS_PATH" | grep ".xcodeproj" | sed 's/.xcodeproj//')
-        if [ -z "$APP_NAME" ]; then
-            echo "No Xcode project found in the iOS directory."
-            exit 1
-        fi
-    else
-        echo "iOS directory not found."
-        exit 1
-    fi
+# - script: |
+#     # Automatically detect the app name from the iOS directory
+#     IOS_PATH="ios"
+#     if [ -d "$IOS_PATH" ]; then
+#         APP_NAME=$(ls "$IOS_PATH" | grep ".xcodeproj" | sed 's/.xcodeproj//')
+#         if [ -z "$APP_NAME" ]; then
+#             echo "No Xcode project found in the iOS directory."
+#             exit 1
+#         fi
+#     else
+#         echo "iOS directory not found."
+#         exit 1
+#     fi
 
-    echo "Detected app name: $APP_NAME"
-    echo "##vso[task.setvariable variable=APP_NAME]$APP_NAME"
-  displayName: 'Detect App Name'
+#     echo "Detected app name: $APP_NAME"
+#     echo "##vso[task.setvariable variable=APP_NAME]$APP_NAME"
+#   displayName: 'Detect App Name'
 
-- script: |
-    # Define paths for provisioning profile and keychain setup
-    P12_CERT_PATH="$(Build.SourcesDirectory)/ios/distribution.p12"
-    PROVISIONING_PROFILE_PATH="$(Build.SourcesDirectory)/ios/profile.mobileprovision"
-    KEYCHAIN_PATH="$HOME/Library/Keychains/temp-keychain.keychain-db"
-    KEYCHAIN_PASSWORD="temp123"
+# - script: |
+#     # Define paths for provisioning profile and keychain setup
+#     P12_CERT_PATH="$(Build.SourcesDirectory)/ios/distribution.p12"
+#     PROVISIONING_PROFILE_PATH="$(Build.SourcesDirectory)/ios/profile.mobileprovision"
+#     KEYCHAIN_PATH="$HOME/Library/Keychains/temp-keychain.keychain-db"
+#     KEYCHAIN_PASSWORD="temp123"
 
-    # Create a temporary keychain for code signing
-    if security list-keychains | grep -q "temp-keychain.keychain-db"; then
-        echo "Deleting existing temporary keychain..."
-        security delete-keychain "$KEYCHAIN_PATH"
-    fi
+#     # Create a temporary keychain for code signing
+#     if security list-keychains | grep -q "temp-keychain.keychain-db"; then
+#         echo "Deleting existing temporary keychain..."
+#         security delete-keychain "$KEYCHAIN_PATH"
+#     fi
 
-    echo "Creating temporary keychain..."
-    security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+#     echo "Creating temporary keychain..."
+#     security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
 
-    echo "Setting temporary keychain as default..."
-    security list-keychains -d user -s "$KEYCHAIN_PATH"
-    security default-keychain -s "$KEYCHAIN_PATH"
-    security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
-    security set-keychain-settings -lut 3600 "$KEYCHAIN_PATH"
+#     echo "Setting temporary keychain as default..."
+#     security list-keychains -d user -s "$KEYCHAIN_PATH"
+#     security default-keychain -s "$KEYCHAIN_PATH"
+#     security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+#     security set-keychain-settings -lut 3600 "$KEYCHAIN_PATH"
 
-    echo "Importing distribution certificate (PKCS#12) into temporary keychain..."
-    security import "$P12_CERT_PATH" -k "$KEYCHAIN_PATH" -P "123456" -T /usr/bin/codesign
-    security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
-  displayName: 'Setup Temporary Keychain and Install Certificate'
+#     echo "Importing distribution certificate (PKCS#12) into temporary keychain..."
+#     security import "$P12_CERT_PATH" -k "$KEYCHAIN_PATH" -P "123456" -T /usr/bin/codesign
+#     security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+#   displayName: 'Setup Temporary Keychain and Install Certificate'
 
-- task: NodeTool@0
-  inputs:
-    versionSpec: '18.x'  # React Native와 호환되는 안정적인 버전 사용
-  displayName: 'Install Node.js'
+# - task: NodeTool@0
+#   inputs:
+#     versionSpec: '18.x'  # React Native와 호환되는 안정적인 버전 사용
+#   displayName: 'Install Node.js'
 
-- script: |
-    echo "Removing existing node_modules..."
-    rm -rf node_modules
-    rm -f package-lock.json
+# - script: |
+#     echo "Removing existing node_modules..."
+#     rm -rf node_modules
+#     rm -f package-lock.json
 
-    echo "Reinstalling Node modules..."
-    npm install --legacy-peer-deps
+#     echo "Reinstalling Node modules..."
+#     npm install --legacy-peer-deps
 
-    echo "Verifying React Native scripts..."
-    if [ -f "node_modules/react-native/scripts/react_native_pods.rb" ]; then
-      echo "✅ React Native scripts found!"
-    else
-      echo "❌ React Native scripts missing! Attempting to restore..."
-      npm audit fix --force
-    fi
-  displayName: 'Reinstall Node Modules'
+#     echo "Verifying React Native scripts..."
+#     if [ -f "node_modules/react-native/scripts/react_native_pods.rb" ]; then
+#       echo "✅ React Native scripts found!"
+#     else
+#       echo "❌ React Native scripts missing! Attempting to restore..."
+#       npm audit fix --force
+#     fi
+#   displayName: 'Reinstall Node Modules'
 
-- script: |
-    # 기존 Pods 완전 삭제
-    rm -rf ios/Pods
-    rm -rf ios/Podfile.lock
-    rm -rf ~/Library/Caches/CocoaPods
+# - script: |
+#     # 기존 Pods 완전 삭제
+#     rm -rf ios/Pods
+#     rm -rf ios/Podfile.lock
+#     rm -rf ~/Library/Caches/CocoaPods
 
-    # CocoaPods 재설치 (시스템 Ruby 대신 brew 사용)
-    echo "Installing CocoaPods using Homebrew..."
-    brew install cocoapods
+#     # CocoaPods 재설치 (시스템 Ruby 대신 brew 사용)
+#     echo "Installing CocoaPods using Homebrew..."
+#     brew install cocoapods
 
-    # Pod 설치 전 PATH 설정
-    # export PATH="/opt/homebrew/bin:$PATH"
-    # which pod
-    # # Pod 재설치
-    # cd ios
-    # pod install --repo-update --verbose
-    # cd ..
-  displayName: '[수정] Reinstall CocoaPods and Pods'
+#     # Pod 설치 전 PATH 설정
+#     # export PATH="/opt/homebrew/bin:$PATH"
+#     # which pod
+#     # # Pod 재설치
+#     # cd ios
+#     # pod install --repo-update --verbose
+#     # cd ..
+#   displayName: '[수정] Reinstall CocoaPods and Pods'
   
 # - script: |
 #     echo "🔧 Hermes podspec 안전하게 수정 중 (macOS 비호환 블록 비활성화)"
@@ -135,381 +135,419 @@ steps:
 #     ruby -c "$PODSPEC_PATH"
 #   displayName: '[Hermes] Podspec 안전 수정'
 
-- script: |
-    # First, detect the app name correctly
-    # APP_NAME=$(ls ios | grep ".xcodeproj" | sed 's/.xcodeproj//')
-    # echo "Detected app name: $APP_NAME"
+# - script: |
+#     # First, detect the app name correctly
+#     # APP_NAME=$(ls ios | grep ".xcodeproj" | sed 's/.xcodeproj//')
+#     # echo "Detected app name: $APP_NAME"
     
-    # Now run pod install with correct PATH
-    cd ios
-    export GEM_HOME=$HOME/.gem
-    export PATH=$GEM_HOME/ruby/2.6.0/bin:$PATH
-    pod install --repo-update
-  displayName: 'Fix Podfile and Install Pods'
-
-- script: |
-    # React Native iOS 앱 이름 자동 감지
-    if [ -d "ios" ]; then
-        APP_NAME=$(ls ios | grep ".xcodeproj" | sed 's/.xcodeproj//')
-        if [ -z "$APP_NAME" ]; then
-            echo "##vso[task.logissue type=error] iOS 디렉토리에서 Xcode 프로젝트를 찾을 수 없습니다."
-            exit 1
-        fi
-        echo "감지된 앱 이름: $APP_NAME"
-    else
-        echo "##vso[task.logissue type=error] iOS 디렉토리를 찾을 수 없습니다. React Native 프로젝트인지 확인하세요."
-        exit 1
-    fi
-    
-    # Info.plist 경로
-    INFO_PLIST_PATH="$(Build.SourcesDirectory)/ios/${APP_NAME}/Info.plist"
-    echo "Info.plist 확인 경로: $INFO_PLIST_PATH"
-
-    # 1. Info.plist에서 직접 추출 시도
-    if [ -f "$INFO_PLIST_PATH" ]; then
-        echo "Info.plist 발견. CFBundleIdentifier 추출 중..."
-        BUNDLE_ID=$(/usr/libexec/PlistBuddy -c "Print :CFBundleIdentifier" "$INFO_PLIST_PATH" 2>/dev/null)
-        
-        # 변수 값이 포함되어 있거나 빈 값인 경우 Xcode 빌드 설정에서 추출
-        if [[ "$BUNDLE_ID" == *"$"* ]] || [ -z "$BUNDLE_ID" ]; then
-            echo "변수 감지 또는 빈 값. Xcode 빌드 설정에서 PRODUCT_BUNDLE_IDENTIFIER 검색..."
-            
-            # 워크스페이스 파일 확인
-            if [ -f "ios/${APP_NAME}.xcworkspace" ]; then
-                echo "워크스페이스 파일 사용: ios/${APP_NAME}.xcworkspace"
-                BUNDLE_ID=$(xcodebuild -showBuildSettings \
-                            -workspace "ios/${APP_NAME}.xcworkspace" \
-                            -scheme "${APP_NAME}" \
-                            -configuration Release \
-                            -sdk iphoneos 2>/dev/null |
-                            grep -E '^\s*PRODUCT_BUNDLE_IDENTIFIER\s*=' |
-                            awk -F '=' '{print $2}' |
-                            sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')
-            else
-                echo "프로젝트 파일 사용: ios/${APP_NAME}.xcodeproj"
-                BUNDLE_ID=$(xcodebuild -showBuildSettings \
-                            -project "ios/${APP_NAME}.xcodeproj" \
-                            -scheme "${APP_NAME}" \
-                            -configuration Release \
-                            -sdk iphoneos 2>/dev/null |
-                            grep -E '^\s*PRODUCT_BUNDLE_IDENTIFIER\s*=' |
-                            awk -F '=' '{print $2}' |
-                            sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')
-            fi
-        fi
-    else
-        # 2. Info.plist 없을 경우 Xcode 빌드 설정에서 직접 추출
-        echo "Info.plist 없음. Xcode 빌드 설정에서 추출..."
-        
-        # 워크스페이스 파일 확인
-        if [ -f "ios/${APP_NAME}.xcworkspace" ]; then
-            echo "워크스페이스 파일 사용: ios/${APP_NAME}.xcworkspace"
-            BUNDLE_ID=$(xcodebuild -showBuildSettings \
-                        -workspace "ios/${APP_NAME}.xcworkspace" \
-                        -scheme "${APP_NAME}" \
-                        -configuration Release \
-                        -sdk iphoneos 2>/dev/null |
-                        grep -E '^\s*PRODUCT_BUNDLE_IDENTIFIER\s*=' |
-                        awk -F '=' '{print $2}' |
-                        sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')
-        else
-            echo "프로젝트 파일 사용: ios/${APP_NAME}.xcodeproj"
-            BUNDLE_ID=$(xcodebuild -showBuildSettings \
-                        -project "ios/${APP_NAME}.xcodeproj" \
-                        -scheme "${APP_NAME}" \
-                        -configuration Release \
-                        -sdk iphoneos 2>/dev/null |
-                        grep -E '^\s*PRODUCT_BUNDLE_IDENTIFIER\s*=' |
-                        awk -F '=' '{print $2}' |
-                        sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')
-        fi
-    fi
-
-    # 3. 여전히 번들 ID를 찾지 못한 경우 pbxproj 파일에서 직접 검색
-    if [ -z "$BUNDLE_ID" ]; then
-        echo "빌드 설정에서 번들 ID를 찾지 못했습니다. pbxproj 파일에서 검색..."
-        PBXPROJ_PATH="ios/${APP_NAME}.xcodeproj/project.pbxproj"
-        if [ -f "$PBXPROJ_PATH" ]; then
-            BUNDLE_ID=$(grep -A 5 "PRODUCT_BUNDLE_IDENTIFIER" "$PBXPROJ_PATH" | 
-                       grep -o '"[^"]*"' | 
-                       head -1 | 
-                       sed 's/"//g')
-        fi
-    fi
-
-    # 최종 검증
-    if [ -z "$BUNDLE_ID" ]; then
-        echo "##vso[task.logissue type=error] 번들 식별자를 찾을 수 없습니다!"
-        exit 1
-    fi
-
-    echo "추출된 BUNDLE_ID: $BUNDLE_ID"
-    echo "##vso[task.setvariable variable=BUNDLE_ID]$BUNDLE_ID"
-    echo "##vso[task.logissue type=warning] 추출된 Bundle ID: $BUNDLE_ID"
-  displayName: 'Extract Bundle ID from React Native iOS Project'
-
-- script: |
-    echo "🔍 ARM64 'hermes' 파일 교체 작업 시작..."
-
-    # 경로 정의
-    HERMES_ENGINE_PATH="ios/Pods/hermes-engine"
-    APP_SEALING_SDK_PATH="ios/AppSealingSDK"
-    SOURCE_HERMES_FILE="$APP_SEALING_SDK_PATH/hermes"
-
-    # Step 1: 타겟 폴더 확인
-    if [ ! -d "$HERMES_ENGINE_PATH" ]; then
-        echo "❌ hermes-engine 디렉토리가 존재하지 않습니다: $HERMES_ENGINE_PATH"
-        exit 1
-    fi
-    echo "✅ 타겟 폴더 확인 완료: $HERMES_ENGINE_PATH"
-
-    # Step 2: 소스 파일 확인
-    if [ ! -f "$SOURCE_HERMES_FILE" ]; then
-        echo "❌ AppSealingSDK 안에 'hermes' 바이너리가 없습니다: $SOURCE_HERMES_FILE"
-        exit 1
-    fi
-
-    SOURCE_SIZE=$(stat -f%z "$SOURCE_HERMES_FILE")
-    SOURCE_ARCH=$(lipo -archs "$SOURCE_HERMES_FILE" 2>/dev/null || echo "Unknown")
-    echo "✅ AppSealingSDK hermes 파일 확인됨"
-    echo "  Path: $SOURCE_HERMES_FILE"
-    echo "  Size: ${SOURCE_SIZE} bytes"
-    echo "  Arch: ${SOURCE_ARCH}"
-
-    # Step 3: arm64 아키텍처 검증
-    if ! echo "$SOURCE_ARCH" | grep -q "arm64"; then
-        echo "##vso[task.logissue type=error] AppSealingSDK Hermes가 arm64 아키텍처를 포함하지 않음"
-        exit 1
-    fi
-
-    # Step 4: Pods 내부 'hermes' 바이너리 찾기
-    echo "🔍 hermes-engine 내부의 'hermes' 바이너리 검색 중..."
-    TARGET_HERMES_FILES=$(find "$HERMES_ENGINE_PATH" -type f -name "hermes" 2>/dev/null)
-
-    if [ -z "$TARGET_HERMES_FILES" ]; then
-        echo "❌ hermes-engine 안에서 대체할 'hermes' 파일을 찾을 수 없습니다."
-        exit 1
-    fi
-
-    # Step 5: 복사 및 검증
-    for TARGET_FILE in $TARGET_HERMES_FILES; do
-        echo "🔄 교체 중: $TARGET_FILE"
-        cp -fv "$SOURCE_HERMES_FILE" "$TARGET_FILE"
-
-        UPDATED_ARCH=$(lipo -archs "$TARGET_FILE" 2>/dev/null || echo "Unknown")
-        if ! echo "$UPDATED_ARCH" | grep -q "arm64"; then
-            echo "##vso[task.logissue type=error] 아키텍처 검증 실패: $TARGET_FILE"
-            exit 1
-        fi
-    done
-
-    echo "✅ 모든 'hermes' 파일이 성공적으로 교체되었습니다."
-
-    # 최종 확인
-    echo "🔍 최종 확인:"
-    for file in $TARGET_HERMES_FILES; do
-        FILE_SIZE=$(stat -f%z "$file")
-        ARCHITECTURES=$(lipo -archs "$file" 2>/dev/null || echo "Unknown")
-        echo "  Path: $file"
-        echo "  Size: ${FILE_SIZE} bytes"
-        echo "  Arch: ${ARCHITECTURES}"
-    done
-  displayName: '[중요] Replace ARM64 Hermes Files in Pods'
-
-- script: |
-    EXPORT_DIR="$(Build.ArtifactStagingDirectory)"
-    mkdir -p "$EXPORT_DIR"
-    
-    cat << EOF > "$EXPORT_DIR/ExportOptions.plist"
-    <?xml version="1.0" encoding="UTF-8"?>
-    <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-    <plist version="1.0">
-    <dict>
-        <key>method</key>
-        <string>app-store</string>
-        <key>teamID</key>
-        <string>${{ parameters.TEAM_ID }}</string>
-        <key>provisioningProfiles</key>
-        <dict>
-            <key>$BUNDLE_ID</key>
-            <string>${{ parameters.PROVISIONING_PROFILE_NAME }}</string>
-        </dict>
-    </dict>
-    </plist>
-    EOF
-    
-    echo "ExportOptions.plist created with provisioningProfiles and bundle ID."
-    cat "$EXPORT_DIR/ExportOptions.plist"  # Output the created plist content for debugging
-
-  displayName: 'Generate ExportOptions.plist'
-
-- script: |
-    echo "Creating Bridging Header..."
-    cat > ios/Azure_RN078-Bridging-Header.h << 'EOF'
-    #import <React/RCTBridgeModule.h>
-    #import <React/RCTBridge.h>
-    #import <React/RCTEventDispatcher.h>
-    #import <React/RCTRootView.h>
-    #import <React/RCTUtils.h>
-    #import <React/RCTConvert.h>
-    #import <React/RCTBundleURLProvider.h>
-    EOF
-    
-    echo "Updating project file with sed instead of plutil..."
-    cd ios
-    sed -i '' 's|SWIFT_OBJC_BRIDGING_HEADER = .*;|SWIFT_OBJC_BRIDGING_HEADER = "Azure_RN078-Bridging-Header.h";|g' Azure_RN078.xcodeproj/project.pbxproj || echo "Sed command failed, will use direct reference in build command instead"
-    cd ..
-  displayName: 'Setup Bridging Header with sed'
-
-- script: |
-    EXPORT_DIR="$(Build.ArtifactStagingDirectory)"
-    ARCHIVE_PATH="$EXPORT_DIR/${APP_NAME}.xcarchive"
-    
-    # 1. .xcworkspace 존재 확인
-    WORKSPACE_PATH="$(Build.SourcesDirectory)/ios/${APP_NAME}.xcworkspace"
-    if [ ! -d "$WORKSPACE_PATH" ]; then
-        echo "##vso[task.logissue type=error] .xcworkspace not found: $WORKSPACE_PATH"
-        exit 1
-    fi
-
-    rm -rf ~/Library/Developer/Xcode/DerivedData
-    rm -rf ios/Pods
-    pod cache clean --all
-  
-    # 2. 아카이브 빌드
-    cd ios
-    xcodebuild clean archive \
-      -workspace "${APP_NAME}.xcworkspace" \
-      -scheme "${APP_NAME}" \
-      -sdk iphoneos \
-      -configuration Release \
-      clean archive \
-      CODE_SIGN_IDENTITY="Apple Distribution" \
-      CODE_SIGN_STYLE="Manual" \
-      CODE_SIGN_IDENTITY="Apple Distribution" \
-      DEVELOPMENT_TEAM="${{ parameters.TEAM_ID }}" \
-      PROVISIONING_PROFILE_SPECIFIER="${{ parameters.PROVISIONING_PROFILE_NAME }}" \
-      SWIFT_OBJC_BRIDGING_HEADER="Azure_RN078-Bridging-Header.h" \
-      -archivePath "$(Build.ArtifactStagingDirectory)/${APP_NAME}.xcarchive"
-
-    # 3. IPA 내보내기
-    xcodebuild -exportArchive \
-      -archivePath "$ARCHIVE_PATH" \
-      -exportOptionsPlist "$EXPORT_DIR/ExportOptions.plist" \
-      -exportPath "$EXPORT_DIR"
-    
-    echo "IPA exported to: $EXPORT_DIR"
-  displayName: 'Build and Export IPA'
+#     # Now run pod install with correct PATH
+#     cd ios
+#     export GEM_HOME=$HOME/.gem
+#     export PATH=$GEM_HOME/ruby/2.6.0/bin:$PATH
+#     pod install --repo-update
+#   displayName: 'Fix Podfile and Install Pods'
 
 # - script: |
-#     echo "🔍 IPA 파일 내 Hermes 파일 교체 작업 시작..."
+#     # React Native iOS 앱 이름 자동 감지
+#     if [ -d "ios" ]; then
+#         APP_NAME=$(ls ios | grep ".xcodeproj" | sed 's/.xcodeproj//')
+#         if [ -z "$APP_NAME" ]; then
+#             echo "##vso[task.logissue type=error] iOS 디렉토리에서 Xcode 프로젝트를 찾을 수 없습니다."
+#             exit 1
+#         fi
+#         echo "감지된 앱 이름: $APP_NAME"
+#     else
+#         echo "##vso[task.logissue type=error] iOS 디렉토리를 찾을 수 없습니다. React Native 프로젝트인지 확인하세요."
+#         exit 1
+#     fi
+    
+#     # Info.plist 경로
+#     INFO_PLIST_PATH="$(Build.SourcesDirectory)/ios/${APP_NAME}/Info.plist"
+#     echo "Info.plist 확인 경로: $INFO_PLIST_PATH"
 
-#     # 경로 설정
-#     EXPORT_DIR="$(Build.ArtifactStagingDirectory)"
-#     IPA_PATH=$(find "$EXPORT_DIR" -type f -name "*.ipa" | head -n 1)
-#     EXTRACT_DIR="$EXPORT_DIR/extracted_ipa"
-#     REPACKED_IPA="$EXPORT_DIR/repacked_app.ipa"
-#     APP_SEALING_SDK_DIR="$(Build.SourcesDirectory)/ios/AppSealingSDK"
+#     # 1. Info.plist에서 직접 추출 시도
+#     if [ -f "$INFO_PLIST_PATH" ]; then
+#         echo "Info.plist 발견. CFBundleIdentifier 추출 중..."
+#         BUNDLE_ID=$(/usr/libexec/PlistBuddy -c "Print :CFBundleIdentifier" "$INFO_PLIST_PATH" 2>/dev/null)
+        
+#         # 변수 값이 포함되어 있거나 빈 값인 경우 Xcode 빌드 설정에서 추출
+#         if [[ "$BUNDLE_ID" == *"$"* ]] || [ -z "$BUNDLE_ID" ]; then
+#             echo "변수 감지 또는 빈 값. Xcode 빌드 설정에서 PRODUCT_BUNDLE_IDENTIFIER 검색..."
+            
+#             # 워크스페이스 파일 확인
+#             if [ -f "ios/${APP_NAME}.xcworkspace" ]; then
+#                 echo "워크스페이스 파일 사용: ios/${APP_NAME}.xcworkspace"
+#                 BUNDLE_ID=$(xcodebuild -showBuildSettings \
+#                             -workspace "ios/${APP_NAME}.xcworkspace" \
+#                             -scheme "${APP_NAME}" \
+#                             -configuration Release \
+#                             -sdk iphoneos 2>/dev/null |
+#                             grep -E '^\s*PRODUCT_BUNDLE_IDENTIFIER\s*=' |
+#                             awk -F '=' '{print $2}' |
+#                             sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')
+#             else
+#                 echo "프로젝트 파일 사용: ios/${APP_NAME}.xcodeproj"
+#                 BUNDLE_ID=$(xcodebuild -showBuildSettings \
+#                             -project "ios/${APP_NAME}.xcodeproj" \
+#                             -scheme "${APP_NAME}" \
+#                             -configuration Release \
+#                             -sdk iphoneos 2>/dev/null |
+#                             grep -E '^\s*PRODUCT_BUNDLE_IDENTIFIER\s*=' |
+#                             awk -F '=' '{print $2}' |
+#                             sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')
+#             fi
+#         fi
+#     else
+#         # 2. Info.plist 없을 경우 Xcode 빌드 설정에서 직접 추출
+#         echo "Info.plist 없음. Xcode 빌드 설정에서 추출..."
+        
+#         # 워크스페이스 파일 확인
+#         if [ -f "ios/${APP_NAME}.xcworkspace" ]; then
+#             echo "워크스페이스 파일 사용: ios/${APP_NAME}.xcworkspace"
+#             BUNDLE_ID=$(xcodebuild -showBuildSettings \
+#                         -workspace "ios/${APP_NAME}.xcworkspace" \
+#                         -scheme "${APP_NAME}" \
+#                         -configuration Release \
+#                         -sdk iphoneos 2>/dev/null |
+#                         grep -E '^\s*PRODUCT_BUNDLE_IDENTIFIER\s*=' |
+#                         awk -F '=' '{print $2}' |
+#                         sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')
+#         else
+#             echo "프로젝트 파일 사용: ios/${APP_NAME}.xcodeproj"
+#             BUNDLE_ID=$(xcodebuild -showBuildSettings \
+#                         -project "ios/${APP_NAME}.xcodeproj" \
+#                         -scheme "${APP_NAME}" \
+#                         -configuration Release \
+#                         -sdk iphoneos 2>/dev/null |
+#                         grep -E '^\s*PRODUCT_BUNDLE_IDENTIFIER\s*=' |
+#                         awk -F '=' '{print $2}' |
+#                         sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')
+#         fi
+#     fi
 
-#     # 1. IPA 파일 추출
-#     echo "📦 IPA 추출: $IPA_PATH -> $EXTRACT_DIR"
-#     rm -rf "$EXTRACT_DIR"
-#     unzip -q "$IPA_PATH" -d "$EXTRACT_DIR"
+#     # 3. 여전히 번들 ID를 찾지 못한 경우 pbxproj 파일에서 직접 검색
+#     if [ -z "$BUNDLE_ID" ]; then
+#         echo "빌드 설정에서 번들 ID를 찾지 못했습니다. pbxproj 파일에서 검색..."
+#         PBXPROJ_PATH="ios/${APP_NAME}.xcodeproj/project.pbxproj"
+#         if [ -f "$PBXPROJ_PATH" ]; then
+#             BUNDLE_ID=$(grep -A 5 "PRODUCT_BUNDLE_IDENTIFIER" "$PBXPROJ_PATH" | 
+#                        grep -o '"[^"]*"' | 
+#                        head -1 | 
+#                        sed 's/"//g')
+#         fi
+#     fi
 
-#     # 디버깅: 디렉토리 구조 출력
-#     echo "🔎 추출된 디렉토리 구조:"
-#     find "$EXTRACT_DIR" -type d | sed 's/^/  /'
-
-#     # 2. Hermes 파일 검색 (정확한 이름과 대소문자 구분)
-#     echo "🔍 Hermes 파일 검색 시작..."
-#     HERMES_FILES=$(find "$EXTRACT_DIR" -type f -name "hermes" 2>/dev/null)
-
-#     # 디버깅: 발견된 파일 목록 출력
-#     echo "🔍 발견된 Hermes 파일 목록:"
-#     echo "$HERMES_FILES" | sed 's/^/  /'
-
-#     if [ -z "$HERMES_FILES" ]; then
-#         echo "❌ 추출된 IPA에서 Hermes 파일을 찾을 수 없습니다."
+#     # 최종 검증
+#     if [ -z "$BUNDLE_ID" ]; then
+#         echo "##vso[task.logissue type=error] 번들 식별자를 찾을 수 없습니다!"
 #         exit 1
 #     fi
 
-#     # 3. 파일 교체
-#     for TARGET_FILE in $HERMES_FILES; do
-#         FILENAME=$(basename "$TARGET_FILE")
-#         SOURCE_FILE=$(find "$APP_SEALING_SDK_DIR" -name "$FILENAME" -type f 2>/dev/null)
+#     echo "추출된 BUNDLE_ID: $BUNDLE_ID"
+#     echo "##vso[task.setvariable variable=BUNDLE_ID]$BUNDLE_ID"
+#     echo "##vso[task.logissue type=warning] 추출된 Bundle ID: $BUNDLE_ID"
+#   displayName: 'Extract Bundle ID from React Native iOS Project'
 
-#         if [ -n "$SOURCE_FILE" ]; then
-#             echo "🔄 교체: $TARGET_FILE"
-#             cp -fv "$SOURCE_FILE" "$TARGET_FILE" || echo "⚠️  실패: $FILENAME"
-            
-#             # 검증: 파일 크기 비교
-#             TARGET_SIZE=$(stat -f%z "$TARGET_FILE")
-#             SOURCE_SIZE=$(stat -f%z "$SOURCE_FILE")
-#             echo "  소스 크기: ${SOURCE_SIZE} 바이트"
-#             echo "  대상 크기: ${TARGET_SIZE} 바이트"
-#         else
-#             echo "⏩ 소스 파일 없음: $FILENAME"
+# - script: |
+#     echo "🔍 ARM64 'hermes' 파일 교체 작업 시작..."
+
+#     # 경로 정의
+#     HERMES_ENGINE_PATH="ios/Pods/hermes-engine"
+#     APP_SEALING_SDK_PATH="ios/AppSealingSDK"
+#     SOURCE_HERMES_FILE="$APP_SEALING_SDK_PATH/hermes"
+
+#     # Step 1: 타겟 폴더 확인
+#     if [ ! -d "$HERMES_ENGINE_PATH" ]; then
+#         echo "❌ hermes-engine 디렉토리가 존재하지 않습니다: $HERMES_ENGINE_PATH"
+#         exit 1
+#     fi
+#     echo "✅ 타겟 폴더 확인 완료: $HERMES_ENGINE_PATH"
+
+#     # Step 2: 소스 파일 확인
+#     if [ ! -f "$SOURCE_HERMES_FILE" ]; then
+#         echo "❌ AppSealingSDK 안에 'hermes' 바이너리가 없습니다: $SOURCE_HERMES_FILE"
+#         exit 1
+#     fi
+
+#     SOURCE_SIZE=$(stat -f%z "$SOURCE_HERMES_FILE")
+#     SOURCE_ARCH=$(lipo -archs "$SOURCE_HERMES_FILE" 2>/dev/null || echo "Unknown")
+#     echo "✅ AppSealingSDK hermes 파일 확인됨"
+#     echo "  Path: $SOURCE_HERMES_FILE"
+#     echo "  Size: ${SOURCE_SIZE} bytes"
+#     echo "  Arch: ${SOURCE_ARCH}"
+
+#     # Step 3: arm64 아키텍처 검증
+#     if ! echo "$SOURCE_ARCH" | grep -q "arm64"; then
+#         echo "##vso[task.logissue type=error] AppSealingSDK Hermes가 arm64 아키텍처를 포함하지 않음"
+#         exit 1
+#     fi
+
+#     # Step 4: Pods 내부 'hermes' 바이너리 찾기
+#     echo "🔍 hermes-engine 내부의 'hermes' 바이너리 검색 중..."
+#     TARGET_HERMES_FILES=$(find "$HERMES_ENGINE_PATH" -type f -name "hermes" 2>/dev/null)
+
+#     if [ -z "$TARGET_HERMES_FILES" ]; then
+#         echo "❌ hermes-engine 안에서 대체할 'hermes' 파일을 찾을 수 없습니다."
+#         exit 1
+#     fi
+
+#     # Step 5: 복사 및 검증
+#     for TARGET_FILE in $TARGET_HERMES_FILES; do
+#         echo "🔄 교체 중: $TARGET_FILE"
+#         cp -fv "$SOURCE_HERMES_FILE" "$TARGET_FILE"
+
+#         UPDATED_ARCH=$(lipo -archs "$TARGET_FILE" 2>/dev/null || echo "Unknown")
+#         if ! echo "$UPDATED_ARCH" | grep -q "arm64"; then
+#             echo "##vso[task.logissue type=error] 아키텍처 검증 실패: $TARGET_FILE"
+#             exit 1
 #         fi
 #     done
 
-#     # 4. 재압축
-#     echo "📦 재압축: $REPACKED_IPA"
-#     cd "$EXTRACT_DIR"
-#     zip -qr "$REPACKED_IPA" ./*
+#     echo "✅ 모든 'hermes' 파일이 성공적으로 교체되었습니다."
+
+#     # 최종 확인
+#     echo "🔍 최종 확인:"
+#     for file in $TARGET_HERMES_FILES; do
+#         FILE_SIZE=$(stat -f%z "$file")
+#         ARCHITECTURES=$(lipo -archs "$file" 2>/dev/null || echo "Unknown")
+#         echo "  Path: $file"
+#         echo "  Size: ${FILE_SIZE} bytes"
+#         echo "  Arch: ${ARCHITECTURES}"
+#     done
+#   displayName: '[중요] Replace ARM64 Hermes Files in Pods'
+
+# - script: |
+#     EXPORT_DIR="$(Build.ArtifactStagingDirectory)"
+#     mkdir -p "$EXPORT_DIR"
     
-#     echo "✅ Hermes 파일 교체 완료!"
-#   displayName: '[중요] IPA 내 Hermes 파일 교체 및 검증'
+#     cat << EOF > "$EXPORT_DIR/ExportOptions.plist"
+#     <?xml version="1.0" encoding="UTF-8"?>
+#     <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+#     <plist version="1.0">
+#     <dict>
+#         <key>method</key>
+#         <string>app-store</string>
+#         <key>teamID</key>
+#         <string>${{ parameters.TEAM_ID }}</string>
+#         <key>provisioningProfiles</key>
+#         <dict>
+#             <key>$BUNDLE_ID</key>
+#             <string>${{ parameters.PROVISIONING_PROFILE_NAME }}</string>
+#         </dict>
+#     </dict>
+#     </plist>
+#     EOF
+    
+#     echo "ExportOptions.plist created with provisioningProfiles and bundle ID."
+#     cat "$EXPORT_DIR/ExportOptions.plist"  # Output the created plist content for debugging
 
-- script: |
-    # Grant execution permission to generate_hash script
-    HASH_SCRIPT_PATH="$(Build.SourcesDirectory)/ios/AppSealingSDK/generate_hash"
-    # echo "-------------------------------------"
-    # cd "$(Build.SourcesDirectory)/ios/AppSealingSDK"
-    # ls -al
-    # echo "-------------------------------------"
-    EXPORT_DIR="$(Build.ArtifactStagingDirectory)"
-    # cd "$EXPORT_DIR"
-    # ls -al
-    # echo "-------------------------------------"
-    IPA_PATH=$(find "$EXPORT_DIR" -type f -name "*.ipa" | head -n 1)
+#   displayName: 'Generate ExportOptions.plist'
 
-    echo "Granting execution permission to generate_hash..."
-    chmod +x "$HASH_SCRIPT_PATH"
+# - script: |
+#     echo "Creating Bridging Header..."
+#     cat > ios/Azure_RN078-Bridging-Header.h << 'EOF'
+#     #import <React/RCTBridgeModule.h>
+#     #import <React/RCTBridge.h>
+#     #import <React/RCTEventDispatcher.h>
+#     #import <React/RCTRootView.h>
+#     #import <React/RCTUtils.h>
+#     #import <React/RCTConvert.h>
+#     #import <React/RCTBundleURLProvider.h>
+#     EOF
+    
+#     echo "Updating project file with sed instead of plutil..."
+#     cd ios
+#     sed -i '' 's|SWIFT_OBJC_BRIDGING_HEADER = .*;|SWIFT_OBJC_BRIDGING_HEADER = "Azure_RN078-Bridging-Header.h";|g' Azure_RN078.xcodeproj/project.pbxproj || echo "Sed command failed, will use direct reference in build command instead"
+#     cd ..
+#   displayName: 'Setup Bridging Header with sed'
 
-    echo "Running generate_hash with IPA... $IPA_PATH"
-    "$HASH_SCRIPT_PATH" "$IPA_PATH"
-  displayName: 'Run generate_hash on IPA'
+# - script: |
+#     EXPORT_DIR="$(Build.ArtifactStagingDirectory)"
+#     ARCHIVE_PATH="$EXPORT_DIR/${APP_NAME}.xcarchive"
+    
+#     # 1. .xcworkspace 존재 확인
+#     WORKSPACE_PATH="$(Build.SourcesDirectory)/ios/${APP_NAME}.xcworkspace"
+#     if [ ! -d "$WORKSPACE_PATH" ]; then
+#         echo "##vso[task.logissue type=error] .xcworkspace not found: $WORKSPACE_PATH"
+#         exit 1
+#     fi
 
-- script: |
-    # Upload the IPA file to TestFlight using altool
-    IPA_PATH=$(find "$(Build.ArtifactStagingDirectory)" -type f -name "*.ipa" | head -n 1)
+#     rm -rf ~/Library/Developer/Xcode/DerivedData
+#     rm -rf ios/Pods
+#     pod cache clean --all
+  
+#     # 2. 아카이브 빌드
+#     cd ios
+#     xcodebuild clean archive \
+#       -workspace "${APP_NAME}.xcworkspace" \
+#       -scheme "${APP_NAME}" \
+#       -sdk iphoneos \
+#       -configuration Release \
+#       clean archive \
+#       CODE_SIGN_IDENTITY="Apple Distribution" \
+#       CODE_SIGN_STYLE="Manual" \
+#       CODE_SIGN_IDENTITY="Apple Distribution" \
+#       DEVELOPMENT_TEAM="${{ parameters.TEAM_ID }}" \
+#       PROVISIONING_PROFILE_SPECIFIER="${{ parameters.PROVISIONING_PROFILE_NAME }}" \
+#       SWIFT_OBJC_BRIDGING_HEADER="Azure_RN078-Bridging-Header.h" \
+#       -archivePath "$(Build.ArtifactStagingDirectory)/${APP_NAME}.xcarchive"
 
-    if [ -f "$IPA_PATH" ]; then
-        xcrun altool --upload-app \
-          -f "$IPA_PATH" \
-          -t ios \
-          -u "${{ parameters.APPLE_ID }}" \
-          -p "${{ parameters.APP_SPECIFIC_PASSWORD }}"
+#     # 3. IPA 내보내기
+#     xcodebuild -exportArchive \
+#       -archivePath "$ARCHIVE_PATH" \
+#       -exportOptionsPlist "$EXPORT_DIR/ExportOptions.plist" \
+#       -exportPath "$EXPORT_DIR"
+    
+#     echo "IPA exported to: $EXPORT_DIR"
+#   displayName: 'Build and Export IPA'
 
-        echo "Uploaded IPA to TestFlight successfully."
-    else
-        echo "IPA file not found. Skipping upload."
-        exit 1
-    fi
-  displayName: 'Upload to TestFlight'
+# # - script: |
+# #     echo "🔍 IPA 파일 내 Hermes 파일 교체 작업 시작..."
 
-- script: |
-    # Cleanup temporary keychain and build artifacts
-    TEMP_KEYCHAIN_PATH="$HOME/Library/Keychains/temp-keychain.keychain-db"
+# #     # 경로 설정
+# #     EXPORT_DIR="$(Build.ArtifactStagingDirectory)"
+# #     IPA_PATH=$(find "$EXPORT_DIR" -type f -name "*.ipa" | head -n 1)
+# #     EXTRACT_DIR="$EXPORT_DIR/extracted_ipa"
+# #     REPACKED_IPA="$EXPORT_DIR/repacked_app.ipa"
+# #     APP_SEALING_SDK_DIR="$(Build.SourcesDirectory)/ios/AppSealingSDK"
 
-    if [ -f "$TEMP_KEYCHAIN_PATH" ]; then
-        security delete-keychain "$TEMP_KEYCHAIN_PATH"
-        echo "Temporary keychain deleted successfully."
-    else
-        echo "Temporary keychain not found. Skipping deletion."
-    fi
+# #     # 1. IPA 파일 추출
+# #     echo "📦 IPA 추출: $IPA_PATH -> $EXTRACT_DIR"
+# #     rm -rf "$EXTRACT_DIR"
+# #     unzip -q "$IPA_PATH" -d "$EXTRACT_DIR"
 
-    rm -rf "$(Build.ArtifactStagingDirectory)" ios/build ios/Pods ios/Podfile.lock
+# #     # 디버깅: 디렉토리 구조 출력
+# #     echo "🔎 추출된 디렉토리 구조:"
+# #     find "$EXTRACT_DIR" -type d | sed 's/^/  /'
 
-    echo "Cleanup completed."
-  displayName: 'Cleanup Temporary Files'
+# #     # 2. Hermes 파일 검색 (정확한 이름과 대소문자 구분)
+# #     echo "🔍 Hermes 파일 검색 시작..."
+# #     HERMES_FILES=$(find "$EXTRACT_DIR" -type f -name "hermes" 2>/dev/null)
+
+# #     # 디버깅: 발견된 파일 목록 출력
+# #     echo "🔍 발견된 Hermes 파일 목록:"
+# #     echo "$HERMES_FILES" | sed 's/^/  /'
+
+# #     if [ -z "$HERMES_FILES" ]; then
+# #         echo "❌ 추출된 IPA에서 Hermes 파일을 찾을 수 없습니다."
+# #         exit 1
+# #     fi
+
+# #     # 3. 파일 교체
+# #     for TARGET_FILE in $HERMES_FILES; do
+# #         FILENAME=$(basename "$TARGET_FILE")
+# #         SOURCE_FILE=$(find "$APP_SEALING_SDK_DIR" -name "$FILENAME" -type f 2>/dev/null)
+
+# #         if [ -n "$SOURCE_FILE" ]; then
+# #             echo "🔄 교체: $TARGET_FILE"
+# #             cp -fv "$SOURCE_FILE" "$TARGET_FILE" || echo "⚠️  실패: $FILENAME"
+            
+# #             # 검증: 파일 크기 비교
+# #             TARGET_SIZE=$(stat -f%z "$TARGET_FILE")
+# #             SOURCE_SIZE=$(stat -f%z "$SOURCE_FILE")
+# #             echo "  소스 크기: ${SOURCE_SIZE} 바이트"
+# #             echo "  대상 크기: ${TARGET_SIZE} 바이트"
+# #         else
+# #             echo "⏩ 소스 파일 없음: $FILENAME"
+# #         fi
+# #     done
+
+# #     # 4. 재압축
+# #     echo "📦 재압축: $REPACKED_IPA"
+# #     cd "$EXTRACT_DIR"
+# #     zip -qr "$REPACKED_IPA" ./*
+    
+# #     echo "✅ Hermes 파일 교체 완료!"
+# #   displayName: '[중요] IPA 내 Hermes 파일 교체 및 검증'
+
+# - script: |
+#     # Grant execution permission to generate_hash script
+#     HASH_SCRIPT_PATH="$(Build.SourcesDirectory)/ios/AppSealingSDK/generate_hash"
+#     # echo "-------------------------------------"
+#     # cd "$(Build.SourcesDirectory)/ios/AppSealingSDK"
+#     # ls -al
+#     # echo "-------------------------------------"
+#     EXPORT_DIR="$(Build.ArtifactStagingDirectory)"
+#     # cd "$EXPORT_DIR"
+#     # ls -al
+#     # echo "-------------------------------------"
+#     IPA_PATH=$(find "$EXPORT_DIR" -type f -name "*.ipa" | head -n 1)
+
+#     echo "Granting execution permission to generate_hash..."
+#     chmod +x "$HASH_SCRIPT_PATH"
+
+#     echo "Running generate_hash with IPA... $IPA_PATH"
+#     "$HASH_SCRIPT_PATH" "$IPA_PATH"
+#   displayName: 'Run generate_hash on IPA'
+
+# - script: |
+#     # Upload the IPA file to TestFlight using altool
+#     IPA_PATH=$(find "$(Build.ArtifactStagingDirectory)" -type f -name "*.ipa" | head -n 1)
+
+#     if [ -f "$IPA_PATH" ]; then
+#         xcrun altool --upload-app \
+#           -f "$IPA_PATH" \
+#           -t ios \
+#           -u "${{ parameters.APPLE_ID }}" \
+#           -p "${{ parameters.APP_SPECIFIC_PASSWORD }}"
+
+#         echo "Uploaded IPA to TestFlight successfully."
+#     else
+#         echo "IPA file not found. Skipping upload."
+#         exit 1
+#     fi
+#   displayName: 'Upload to TestFlight'
+
+# - script: |
+#     # Cleanup temporary keychain and build artifacts
+#     TEMP_KEYCHAIN_PATH="$HOME/Library/Keychains/temp-keychain.keychain-db"
+
+#     if [ -f "$TEMP_KEYCHAIN_PATH" ]; then
+#         security delete-keychain "$TEMP_KEYCHAIN_PATH"
+#         echo "Temporary keychain deleted successfully."
+#     else
+#         echo "Temporary keychain not found. Skipping deletion."
+#     fi
+
+#     rm -rf "$(Build.ArtifactStagingDirectory)" ios/build ios/Pods ios/Podfile.lock
+
+#     echo "Cleanup completed."
+#   displayName: 'Cleanup Temporary Files'
+
+  - script: |
+      echo "Installing dependencies..."
+      brew install cocoapods
+      cd ios
+      pod install
+    displayName: 'Install CocoaPods'
+
+  - script: |
+      echo "Cleaning and building..."
+      xcodebuild clean -workspace $WORKSPACE -scheme $SCHEME -configuration $CONFIGURATION
+      xcodebuild archive \
+        -workspace $WORKSPACE \
+        -scheme $SCHEME \
+        -sdk $SDK \
+        -configuration $CONFIGURATION \
+        -archivePath build/$SCHEME.xcarchive \
+        CODE_SIGN_IDENTITY="$CODE_SIGN_IDENTITY" \
+        DEVELOPMENT_TEAM=$TEAM_ID \
+        PRODUCT_BUNDLE_IDENTIFIER=$BUNDLE_ID
+    displayName: 'Archive iOS App'
+
+  - script: |
+      echo "Exporting .ipa..."
+      xcodebuild -exportArchive \
+        -archivePath build/$SCHEME.xcarchive \
+        -exportOptionsPlist $EXPORT_OPTIONS_PLIST \
+        -exportPath build/export
+    displayName: 'Export IPA'
+
+  - script: |
+      echo "Uploading to TestFlight..."
+      xcrun altool --upload-app \
+        --type ios \
+        --file build/export/$SCHEME.ipa \
+        --username "$APPLE_ID" \
+        --password "$APP_SPECIFIC_PASSWORD"
+    displayName: 'Upload to TestFlight'
