@@ -87,7 +87,7 @@ steps:
   displayName: 'Reinstall Node Modules'
 
 - script: |
-    echo "##[group]🔧 Hermes podspec 수정 (Ruby 문법 보존)"
+    echo "##[group]🔧 Hermes podspec 수정 (완벽한 Ruby 문법 보장)"
     set -ex
 
     # 1. 경로 설정
@@ -98,23 +98,27 @@ steps:
     cp -v "$HERMES_PODSPEC" "$BACKUP_PODSPEC"
 
     # 3. 정확한 패치 적용 (Ruby-aware 수정)
-    perl -i -pe '
-      # DOWNLOAD_PREBUILD_RELEASE_TARBALL 블록 주석 처리
-      if (/HermesEngineSourceType::DOWNLOAD_PREBUILD_RELEASE_TARBALL/../^\s*end\s*$/) {
-        s/^/#/ unless /^\s*end\s*$/
-      }
-
-      # script_phases 배열 주석 처리
-      if (/spec\.script_phases = \[/../\]/) {
-        s/^/#/
+    awk -i inplace '
+      # DOWNLOAD_PREBUILD_RELEASE_TARBALL 블록 처리
+      /HermesEngineSourceType::DOWNLOAD_PREBUILD_RELEASE_TARBALL/ { in_block=1 }
+      in_block && /^end$/ { in_block=0 }
+      {
+        if (in_block && !/^end$/) {
+          print "#" $0
+        } else if (/spec\.script_phases = \[/ || in_script) {
+          in_script=1
+          print "#" $0
+          if (/\]]/) in_script=0
+        } else {
+          print $0
+        }
       }
     ' "$HERMES_PODSPEC"
 
     # 4. 문법 검증
     if ! ruby -c "$HERMES_PODSPEC" >/dev/null; then
-      echo "##vso[task.logissue type=error]❌ 문법 오류! diff 출력:"
+      echo "##vso[task.logissue type=error]❌ 문법 오류 발생! 원복 진행..."
       diff -u "$BACKUP_PODSPEC" "$HERMES_PODSPEC" | sed 's/^/  /'
-      echo "##vso[task.logissue type=error] 원복 진행..."
       mv -v "$BACKUP_PODSPEC" "$HERMES_PODSPEC"
       exit 1
     fi
