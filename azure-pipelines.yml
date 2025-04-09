@@ -87,43 +87,58 @@ steps:
   displayName: 'Reinstall Node Modules'
 
 - script: |
-    echo "##[group]🔧 Hermes 복원 방지 최종 패치 (v3)"
-    set -ex
+    echo "##[group]🔧 Hermes 복원 방지 최종 패치 (디버깅 강화)"
+    set -ex  # 명령어 추적 활성화
 
     HERMES_PODSPEC="node_modules/react-native/sdks/hermes-engine/hermes-engine.podspec"
     BACKUP_PODSPEC="${HERMES_PODSPEC}.bak"
 
-    # 1. 정확한 패턴 매칭을 위한 sed 재설계
-    sed -i.bak '
+    echo "🔍 Podspec 경로 확인: $HERMES_PODSPEC"
+    if [ ! -f "$HERMES_PODSPEC" ]; then
+        echo "##vso[task.logissue type=error] Podspec 파일을 찾을 수 없습니다: $HERMES_PODSPEC"
+        exit 1
+    fi
+
+    echo "✅ Podspec 파일 발견. 백업 생성 중..."
+    cp -v "$HERMES_PODSPEC" "$BACKUP_PODSPEC"
+
+    echo "🔍 원본 Podspec 내용 일부 출력:"
+    head -n 50 "$HERMES_PODSPEC" | sed 's/^/  /'
+
+    # 패치 적용
+    echo "🔧 패치 적용 중..."
+    sed -i.bak -e '
       /HermesEngineSourceType::DOWNLOAD_PREBUILD_RELEASE_TARBALL/,/^end/ {
-        s/^/#/  # 전체 블록 주석 처리
-        /^#end/! s/end//  # end 라인에서 주석 제거
+        s/^/#/
+        /^#end/b
+        s/end//g
       }
       /spec\.script_phases = \[/,/\]/ {
-        s/^/##/  # script_phases 주석 처리
+        s/^/##/
       }
     ' "$HERMES_PODSPEC"
 
-    # 2. 수정 사항 검증 (주석 처리 여부 확인)
-    if grep -q "^#.*DOWNLOAD_PREBUILD_RELEASE_TARBALL" "$HERMES_PODSPEC" &&
-       grep -q "^##.*spec.script_phases" "$HERMES_PODSPEC"; then
-        echo "✅ Podspec 패치 성공!"
-        
-        # 디버그: 수정된 내용 출력
-        echo "=== 수정된 Podspec 샘플 ==="
-        grep -A 5 -B 2 "DOWNLOAD_PREBUILD_RELEASE_TARBALL" "$HERMES_PODSPEC" | sed 's/^/  /'
-    else
-        echo "##vso[task.logissue type=error] 패치 실패! 수동 조치 필요"
-        
-        # diff 출력으로 변경 사항 확인
+    echo "🔍 수정된 Podspec 내용 일부 출력:"
+    head -n 50 "$HERMES_PODSPEC" | sed 's/^/  /'
+
+    # 검증
+    echo "🔍 주석 처리 검증..."
+    if ! grep -q "^#.*DOWNLOAD_PREBUILD_RELEASE_TARBALL" "$HERMES_PODSPEC"; then
+        echo "##vso[task.logissue type=error] DOWNLOAD_PREBUILD_RELEASE_TARBALL 블록 주석 처리 실패!"
         diff -u "$BACKUP_PODSPEC" "$HERMES_PODSPEC" | sed 's/^/  /'
         exit 1
     fi
 
-    # 3. 임시 파일 정리
+    if ! grep -q "^##.*spec.script_phases" "$HERMES_PODSPEC"; then
+        echo "##vso[task.logissue type=error] spec.script_phases 블록 주석 처리 실패!"
+        diff -u "$BACKUP_PODSPEC" "$HERMES_PODSPEC" | sed 's/^/  /'
+        exit 1
+    fi
+
+    echo "✅ Podspec 패치 성공!"
     rm -f "${HERMES_PODSPEC}.bak"
     echo "##[endgroup]"
-  displayName: '[Hermes] Podspec 최종 패치 (v3)'
+  displayName: '[Hermes] Podspec 최종 패치 (디버깅 강화)'
 
 # - script: |
 #     echo "##[group]🔧 자동 Hermes 복원 방지 설정 시작..."
