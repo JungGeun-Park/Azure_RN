@@ -86,22 +86,22 @@ steps:
     fi
   displayName: 'Reinstall Node Modules'
 
-# - script: |
-#     export GEM_HOME=$HOME/.gem
-#     export PATH=$GEM_HOME/bin:$PATH
-    
-#     echo "Installing CocoaPods..."
-#     gem install cocoapods --user-install
-    
-#     echo "CocoaPods version:"
-#     export PATH=$HOME/.gem/ruby/*/bin:$PATH
-#     which pod || echo "Pod not found in PATH"
-#     pod --version || echo "Pod command not available"
+- script: |
+    rm -rf ios/Pods
+    rm -rf ios/Podfile.lock
+    rm -rf ios/DerivedData
 
-#     rm -rf ios/Pods
-#     rm -rf ios/Podfile.lock
-#     rm -rf ios/DerivedData
-#   displayName: 'Install CocoaPods'
+    export GEM_HOME=$HOME/.gem
+    export PATH=$GEM_HOME/bin:$PATH
+    
+    echo "Installing CocoaPods..."
+    gem install cocoapods --user-install
+    
+    echo "CocoaPods version:"
+    export PATH=$HOME/.gem/ruby/*/bin:$PATH
+    which pod || echo "Pod not found in PATH"
+    pod --version || echo "Pod command not available"
+  displayName: 'Install CocoaPods'
 
 - script: |
     echo "🔧 Hermes podspec 안전하게 수정 중 (macOS 비호환 블록 비활성화)"
