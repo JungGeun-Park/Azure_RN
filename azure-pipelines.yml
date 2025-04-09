@@ -87,6 +87,31 @@ steps:
   displayName: 'Reinstall Node Modules'
 
 - script: |
+    echo "🔧 자동 Hermes 복원 방지 설정 시작..."
+
+    # 1. Hermes podspec 파일 경로 설정
+    HERMES_PODSPEC="node_modules/react-native/sdks/hermes-engine/hermes-engine.podspec"
+    BACKUP_PODSPEC="${HERMES_PODSPEC}.bak"
+
+    # 2. 기존 podspec 백업
+    cp "$HERMES_PODSPEC" "$BACKUP_PODSPEC"
+    echo "✅ Podspec 백업 생성: $BACKUP_PODSPEC"
+
+    # 3. 문제되는 스크립트 섹션 주석 처리
+    sed -i '' '/if source_type == HermesEngineSourceType::DOWNLOAD_PREBUILD_RELEASE_TARBALL/,/end/ s/^/#/' "$HERMES_PODSPEC"
+    sed -i '' '/spec.script_phases = \[/,/\]/ s/^/#/' "$HERMES_PODSPEC"
+
+    # 4. 파일 존재 여부 확인
+    if grep -q "DOWNLOAD_PREBUILD_RELEASE_TARBALL" "$HERMES_PODSPEC"; then
+        echo "##vso[task.logissue type=error] Podspec 수정 실패!"
+        exit 1
+    fi
+
+    echo "✅ Hermes podspec 수정 완료!"
+  displayName: '[Hermes] Podspec 자동 복원 방지 패치'
+  condition: succeeded()  # 이전 단계 성공 시에만 실행
+
+- script: |
     export GEM_HOME=$HOME/.gem
     export PATH=$GEM_HOME/bin:$PATH
     
@@ -234,65 +259,39 @@ steps:
   displayName: 'Extract Bundle ID from React Native iOS Project'
 
 - script: |
-    echo "🔍 Searching for 'hermes' files in pods/hermes-engine and ios/AppSealingSDK directories..."
+    echo "🔍 Searching and replacing ARM64 'hermes' files in pods/hermes-engine..."
 
     # Define paths
     HERMES_ENGINE_PATH="ios/Pods/hermes-engine"
     APP_SEALING_SDK_PATH="ios/AppSealingSDK"
 
-    # Function to search for hermes files and output path and size
-    search_hermes_files() {
-        local dir_path=$1
-        if [ -d "$dir_path" ]; then
-            echo "✅ Directory found: $dir_path"
-            HERMES_FILES=$(find "$dir_path" -type f -name "hermes")
-            
-            if [ -z "$HERMES_FILES" ]; then
-                echo "❌ No 'hermes' files found in $dir_path"
-            else
-                echo "🔍 Found 'hermes' files:"
-                for file in $HERMES_FILES; do
-                    FILE_SIZE=$(stat -f%z "$file")
-                    echo "  Path: $file"
-                    echo "  Size: ${FILE_SIZE} bytes"
-                done
-            fi
-        else
-            echo "❌ Directory not found: $dir_path"
-        fi
+    # Function to find ARM64 'hermes' files
+    find_arm64_hermes_files() {
+        # 1. ios-arm64 디렉토리에서 파일 검색
+        find "$1" -type f -path "*ios-arm64*" -name "hermes" 2>/dev/null
+        
+        # 2. lipo 아키텍처 검사 (추가 검증용)
+        # find "$1" -type f -name "hermes" -exec sh -c '
+        #     lipo -archs "$1" | grep -q "arm64" && echo "$1"
+        # ' sh {} \; 2>/dev/null
     }
 
-    # Search in pods/hermes-engine directory
-    search_hermes_files "$HERMES_ENGINE_PATH"
-
-    # Search in ios/AppSealingSDK directory
-    search_hermes_files "$APP_SEALING_SDK_PATH"
-  displayName: 'Search for Hermes Files in Pods'
-
-- script: |
-    echo "🔍 Searching and replacing 'hermes' files in pods/hermes-engine..."
-
-    # Define paths
-    HERMES_ENGINE_PATH="ios/Pods/hermes-engine"
-    APP_SEALING_SDK_PATH="ios/AppSealingSDK"
-
-    # Function to find all 'hermes' files in a directory
-    find_hermes_files() {
-        find "$1" -type f -name "hermes" 2>/dev/null
-    }
-
-    # Step 1: Search for hermes files in pods/hermes-engine
+    # Step 1: Search for ARM64 hermes files
     if [ -d "$HERMES_ENGINE_PATH" ]; then
         echo "✅ Directory found: $HERMES_ENGINE_PATH"
-        HERMES_FILES=$(find_hermes_files "$HERMES_ENGINE_PATH")
+        HERMES_FILES=$(find_arm64_hermes_files "$HERMES_ENGINE_PATH")
 
         if [ -z "$HERMES_FILES" ]; then
-            echo "❌ No 'hermes' files found in $HERMES_ENGINE_PATH."
+            echo "❌ No ARM64 'hermes' files found in $HERMES_ENGINE_PATH."
+            exit 1
         else
-            echo "🔍 Found 'hermes' files:"
+            echo "🔍 Found ARM64 'hermes' files:"
             for file in $HERMES_FILES; do
                 FILE_SIZE=$(stat -f%z "$file")
-                echo "  Path: $file, Size: ${FILE_SIZE} bytes"
+                ARCHITECTURES=$(lipo -archs "$file" 2>/dev/null || echo "Unknown")
+                echo "  Path: $file"
+                echo "  Size: ${FILE_SIZE} bytes"
+                echo "  Arch: ${ARCHITECTURES}"
             done
         fi
     else
@@ -300,37 +299,55 @@ steps:
         exit 1
     fi
 
-    # Step 2: Find the source hermes file in AppSealingSDK
+    # Step 2: Find source ARM64 hermes file
     if [ -d "$APP_SEALING_SDK_PATH" ]; then
         echo "✅ Directory found: $APP_SEALING_SDK_PATH"
-        SOURCE_HERMES_FILE=$(find_hermes_files "$APP_SEALING_SDK_PATH" | head -n 1)
+        SOURCE_HERMES_FILE=$(find_arm64_hermes_files "$APP_SEALING_SDK_PATH" | head -n 1)
 
         if [ -z "$SOURCE_HERMES_FILE" ]; then
-            echo "❌ No 'hermes' file found in $APP_SEALING_SDK_PATH."
+            echo "❌ No ARM64 'hermes' file found in $APP_SEALING_SDK_PATH."
             exit 1
         else
             SOURCE_SIZE=$(stat -f%z "$SOURCE_HERMES_FILE")
-            echo "Source 'hermes' file: $SOURCE_HERMES_FILE, Size: ${SOURCE_SIZE} bytes"
+            SOURCE_ARCH=$(lipo -archs "$SOURCE_HERMES_FILE" 2>/dev/null || echo "Unknown")
+            echo "Source ARM64 'hermes' file: $SOURCE_HERMES_FILE"
+            echo "  Size: ${SOURCE_SIZE} bytes"
+            echo "  Arch: ${SOURCE_ARCH}"
         fi
     else
         echo "❌ Directory not found: $APP_SEALING_SDK_PATH"
         exit 1
     fi
 
-    # Step 3: Replace all target hermes files with the source file
+    # Step 3: Architecture validation
+    if ! echo "$SOURCE_ARCH" | grep -q "arm64"; then
+        echo "##vso[task.logissue type=error] AppSealingSDK Hermes가 arm64 아키텍처를 포함하지 않음"
+        exit 1
+    fi
+
+    # Step 4: Replace files
     for TARGET_FILE in $HERMES_FILES; do
+        echo "🔄 Replacing: $TARGET_FILE"
         cp -fv "$SOURCE_HERMES_FILE" "$TARGET_FILE"
-        echo "Replaced: $TARGET_FILE with $SOURCE_HERMES_FILE"
+        
+        # Verify architecture after replacement
+        UPDATED_ARCH=$(lipo -archs "$TARGET_FILE" 2>/dev/null || echo "Unknown")
+        if ! echo "$UPDATED_ARCH" | grep -q "arm64"; then
+            echo "##vso[task.logissue type=error] 아키텍처 검증 실패: $TARGET_FILE"
+            exit 1
+        fi
     done
 
-    # Step 4: Verify replacement by checking sizes again
-    echo "🔍 Verifying replaced 'hermes' files..."
+    # Final verification
+    echo "🔍 Final verification:"
     for file in $HERMES_FILES; do
         FILE_SIZE=$(stat -f%z "$file")
-        echo "  Path: $file, Size after replacement: ${FILE_SIZE} bytes"
+        ARCHITECTURES=$(lipo -archs "$file" 2>/dev/null || echo "Unknown")
+        echo "  Path: $file"
+        echo "  Size: ${FILE_SIZE} bytes"
+        echo "  Arch: ${ARCHITECTURES}"
     done
-
-  displayName: '[중요] Replace Hermes Files in Pods'
+  displayName: '[중요] Replace ARM64 Hermes Files in Pods'
 
 - script: |
     EXPORT_DIR="$(Build.ArtifactStagingDirectory)"
@@ -388,6 +405,10 @@ steps:
         exit 1
     fi
 
+    rm -rf ~/Library/Developer/Xcode/DerivedData
+    rm -rf ios/Pods
+    pod cache clean --all
+  
     # 2. 아카이브 빌드
     cd ios
     xcodebuild clean archive \
