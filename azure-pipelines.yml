@@ -87,22 +87,25 @@ steps:
   displayName: 'Reinstall Node Modules'
 
 - script: |
+    # 기존 Pods 완전 삭제
     rm -rf ios/Pods
     rm -rf ios/Podfile.lock
-    rm -rf ios/DerivedData
+    rm -rf ~/Library/Caches/CocoaPods
 
-    export GEM_HOME=$HOME/.gem
-    export PATH=$GEM_HOME/bin:$PATH
-    
-    echo "Installing CocoaPods..."
-    gem install cocoapods --user-install
-    
-    echo "CocoaPods version:"
-    export PATH=$HOME/.gem/ruby/*/bin:$PATH
-    which pod || echo "Pod not found in PATH"
-    pod --version || echo "Pod command not available"
-  displayName: 'Install CocoaPods'
+    # CocoaPods 재설치 (시스템 Ruby 대신 brew 사용)
+    echo "Installing CocoaPods using Homebrew..."
+    brew install cocoapods
 
+    # Pod 설치 전 PATH 설정
+    export PATH="/opt/homebrew/bin:$PATH"
+    which pod
+
+    # Pod 재설치
+    cd ios
+    pod install --repo-update --verbose
+    cd ..
+  displayName: '[수정] Reinstall CocoaPods and Pods'
+  
 - script: |
     echo "🔧 Hermes podspec 안전하게 수정 중 (macOS 비호환 블록 비활성화)"
 
