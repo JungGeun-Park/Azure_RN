@@ -87,33 +87,31 @@ steps:
   displayName: 'Reinstall Node Modules'
 
 - script: |
-    echo "##[group]🔧 Hermes 자동 복원 방지 패치 (React Native 0.72+ 대응)"
-    set -x
+    echo "##[group]🔧 Hermes 복원 방지 최종 패치"
+    set -ex  # 즉시 종료 및 명령 추적 활성화
 
     HERMES_PODSPEC="node_modules/react-native/sdks/hermes-engine/hermes-engine.podspec"
     BACKUP_PODSPEC="${HERMES_PODSPEC}.bak"
 
-    # 1. 백업 생성
-    cp -v "$HERMES_PODSPEC" "$BACKUP_PODSPEC"
-
-    # 2. 패치 적용 (최신 React Native 구조 반영)
+    # 1. 정확한 패턴 매칭을 위한 sed 수정
     sed -i.bak '
-      /HermesEngineSourceType::DOWNLOAD_PREBUILD_RELEASE_TARBALL/,/end/ s/^/#/
-      /spec\.script_phases = \[/,/\]/ s/^/##/
+      /HermesEngineSourceType::DOWNLOAD_PREBUILD_RELEASE_TARBALL/,/end/ {
+        /^end$/! s/^/#/
+      }
+      /spec\.script_phases = \[/,/\]/ {
+        s/^/##/
+      }
     ' "$HERMES_PODSPEC"
 
-    # 3. 검증 로직 개선
-    if grep -q "DOWNLOAD_PREBUILD_RELEASE_TARBALL" "$HERMES_PODSPEC" || 
-       grep -q "spec.script_phases" "$HERMES_PODSPEC"; then
-        echo "##[error] 패치 실패! 수동 검토 필요"
-        diff -u "$BACKUP_PODSPEC" "$HERMES_PODSPEC" | sed 's/^/  /'
-        exit 1
-    fi
+    # 2. 추가 검증 포인트
+    grep -q "DOWNLOAD_PREBUILD_RELEASE_TARBALL" "$HERMES_PODSPEC" && exit 1
+    grep -q "spec.script_phases" "$HERMES_PODSPEC" && exit 1
 
-    echo "##[section]✅ 패치 적용 성공!"
-    set +x
+    # 3. 성공 로그 출력
+    echo "=== 수정된 Podspec 예시 ==="
+    grep -B 2 -A 5 "DOWNLOAD_PREBUILD_RELEASE_TARBALL" "$HERMES_PODSPEC" | sed 's/^/  /'
     echo "##[endgroup]"
-  displayName: '[Hermes] Podspec 복원 방지 (v2)'
+  displayName: '[Hermes] Podspec 최종 패치'
 
 # - script: |
 #     echo "##[group]🔧 자동 Hermes 복원 방지 설정 시작..."
