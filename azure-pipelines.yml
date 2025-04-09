@@ -87,32 +87,36 @@ steps:
   displayName: 'Reinstall Node Modules'
 
 - script: |
-    echo "##[group]🔧 Hermes podspec 수정 시작 (macOS sed 호환)"
+    echo "##[group]🔧 Hermes podspec 수정 (최종 버전)"
     set -ex
 
     # 1. 경로 설정
     HERMES_PODSPEC="node_modules/react-native/sdks/hermes-engine/hermes-engine.podspec"
-    BACKUP_PODSPEC="${HERMES_PODSPEC}.bak"
+    BACKUP_PODSPEC="${HERMES_PODSPEC}.macos.bak"
 
     # 2. 원본 백업
     cp -v "$HERMES_PODSPEC" "$BACKUP_PODSPEC"
 
-    # 3. 패치 적용 (macOS용 sed 구문)
-    sed -i.bak '
-    /HermesEngineSourceType::DOWNLOAD_PREBUILD_RELEASE_TARBALL/,/^end$/ {
-      /^end$/! s/^/#/
+    # 3. 패치 적용 (macOS용 정확한 범위 처리)
+    sed -i.macos_bak '
+    /HermesEngineSourceType::DOWNLOAD_PREBUILD_RELEASE_TARBALL/,/^[[:space:]]*end[[:space:]]*$/ {
+      /^[[:space:]]*end[[:space:]]*$/! s/^/#/
     }
-    /spec\.script_phases = \[/,/\]/ {
+    /spec\.script_phases = \[/,/^[[:space:]]*\][[:space:]]*$/ {
       s/^/#/
     }' "$HERMES_PODSPEC"
 
     # 4. 문법 검증
     if ! ruby -c "$HERMES_PODSPEC" >/dev/null; then
-      echo "##vso[task.logissue type=error] 문법 오류! 원복 진행..."
+      echo "##vso[task.logissue type=error] 문법 오류! diff 출력:"
+      diff -u "$BACKUP_PODSPEC" "$HERMES_PODSPEC" | sed 's/^/  /'
+      echo "##vso[task.logissue type=error] 원복 진행..."
       mv -v "$BACKUP_PODSPEC" "$HERMES_PODSPEC"
       exit 1
     fi
 
+    # 5. 임시 파일 정리
+    rm -f "${HERMES_PODSPEC}.macos_bak"
     echo "✅ Podspec 수정 성공!"
     echo "##[endgroup]"
   displayName: '[Hermes] Podspec 수정 (상세 로깅)'
