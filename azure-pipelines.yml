@@ -180,8 +180,6 @@ steps:
     fi
 
     echo "Extracted BUNDLE_ID: $BUNDLE_ID"
-    echo "##vso[task.setvariable variable=BUNDLE_ID]$BUNDLE_ID"
-    echo "##vso[task.logissue type=warning] Extracted Bundle ID: $BUNDLE_ID"
   displayName: 'Extract Bundle ID from React Native iOS Project'
 
 # 8) Replace Hermes binaries with AppSealing hermes
