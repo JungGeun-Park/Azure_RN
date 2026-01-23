@@ -1,0 +1,199 @@
+version: 2.1
+
+executors:
+  mac:
+    macos:
+      xcode: 16.4
+    working_directory: /Users/distiller/project
+
+jobs:
+  build_and_deploy:
+    executor: mac
+    steps:
+      - checkout
+
+      - run:
+          name: Install Dependencies
+          command: |
+            brew install node
+            brew install watchman
+            npm install -g yarn
+            cd /Users/distiller/project
+            yarn install
+
+      - run:
+          name: Install Cocoapods
+          command: |
+            cd /Users/distiller/project/ios
+            pod install
+
+      - run:
+          name: Install Apple Certificate
+          command: |
+            mkdir -p /Users/distiller/Library/Developer/Xcode/UserData/Provisioning\ Profiles/
+            cp /Users/distiller/project/ios/profile.mobileprovision /Users/distiller/Library/Developer/Xcode/UserData/Provisioning\ Profiles/
+            security create-keychain -p "circle" build.keychain
+            security import /Users/distiller/project/ios/distribution.p12 -k build.keychain -P "$CERTIFICATE_PASSWORD" -T /usr/bin/codesign
+            security list-keychains -s build.keychain
+            security default-keychain -s build.keychain
+            security unlock-keychain -p "circle" build.keychain
+            security set-keychain-settings -t 3600 -u build.keychain
+            security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "circle" build.keychain
+
+      - run:
+          name: Extract Bundle ID
+          command: |
+            cd /Users/distiller/project/ios
+           
+            # Extract Bundle ID with better parsing to remove NO prefix
+            BUNDLE_ID=$(xcodebuild -showBuildSettings -configuration Release | grep "PRODUCT_BUNDLE_IDENTIFIER =" | awk -F " = " '{print $2}' | grep -v "^NO" | head -n 1)
+            
+            # Validate the Bundle ID
+            if [ -z "$BUNDLE_ID" ] || [[ "$BUNDLE_ID" == *"$"* ]] || [ "$BUNDLE_ID" = "NO" ]; then
+              echo "❌ ERROR: Could not extract valid Bundle ID"
+              exit 1
+            fi
+            
+            echo "export BUNDLE_ID='${BUNDLE_ID}'" >> $BASH_ENV
+            source $BASH_ENV
+
+      - run:
+          name: Create exportOptions.plist
+          command: |
+            cat > /Users/distiller/project/ios/exportOptions.plist \<< EOF
+            <?xml version="1.0" encoding="UTF-8"?>
+            <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+            <plist version="1.0">
+            <dict>
+                <key>method</key>
+                <string>app-store-connect</string>
+                <key>teamID</key>
+                <string>${TEAM_ID}</string>
+                <key>signingStyle</key>
+                <string>manual</string>
+                <key>stripSwiftSymbols</key>
+                <true/>
+                <key>uploadBitcode</key>
+                <false/>
+                <key>provisioningProfiles</key>
+                <dict>
+                    <key>${BUNDLE_ID}</key>
+                    <string>${PROVISIONING_PROFILE_NAME}</string>
+                </dict>
+            </dict>
+            </plist>
+            EOF
+
+      - run:
+          name: Increment Build Number
+          command: |
+            cd /Users/distiller/project/ios
+            buildNumber=$CIRCLE_BUILD_NUM
+            
+            # Get project name
+            PROJECT_NAME=$(ls *.xcodeproj | sed 's/\.xcodeproj//')
+            
+            # Try to update build number using agvtool
+            xcrun agvtool new-version -all "$buildNumber"
+            
+            if [ $? -ne 0 ]; then
+              # Fallback: Update build settings directly
+              xcodebuild -project ${PROJECT_NAME}.xcodeproj \
+                -configuration Release \
+                CURRENT_PROJECT_VERSION="$buildNumber" \
+                build
+            fi
+            
+            echo "✅ Build number updated to: $buildNumber"
+
+      - run:
+          name: Build and Archive
+          command: |
+            cd /Users/distiller/project/ios
+            mkdir -p build/ios
+
+            # Get the first available .xcodeproj file
+            XCODEPROJ_PATH=$(find . -maxdepth 1 -name "*.xcodeproj" | head -n 1)
+
+            if [ -z "$XCODEPROJ_PATH" ]; then
+              echo "❌ ERROR: No .xcodeproj file found"
+              exit 1
+            fi
+
+            # Get the first available scheme from xcodeproj
+            SCHEME_NAME=$(xcodebuild -list -project "$XCODEPROJ_PATH" | awk '/Schemes:/,0' | tail -n +2 | head -n 1 | xargs)
+
+            if [ -z "$SCHEME_NAME" ]; then
+              echo "❌ ERROR: No scheme found in xcodeproj"
+              exit 1
+            fi
+
+            echo "✅ Using scheme: ${SCHEME_NAME}"
+            
+            xcodebuild archive \
+              -workspace *.xcworkspace \
+              -scheme "${SCHEME_NAME}" \
+              -configuration Release \
+              -archivePath build/ios/app.xcarchive \
+              -allowProvisioningUpdates \
+              CODE_SIGN_STYLE=Manual \
+              DEVELOPMENT_TEAM=${TEAM_ID} \
+              PROVISIONING_PROFILE_SPECIFIER="${PROVISIONING_PROFILE_NAME}" \
+              CODE_SIGN_IDENTITY="iPhone Distribution"
+
+            xcodebuild -exportArchive \
+              -archivePath build/ios/app.xcarchive \
+              -exportOptionsPlist exportOptions.plist \
+              -exportPath build/ios/ipa \
+              -allowProvisioningUpdates
+
+      - run:
+          name: Generate Hash
+          command: |
+            cd /Users/distiller/project
+            
+            # Set IPA file output path
+            IPA_OUTPUT_PATH="/Users/distiller/project/ios/build/ios/ipa"
+            
+            # Find generate_hash script in AppSealingSDK directory
+            HASH_SCRIPT=$(find . -type f -name "generate_hash" -path "*/AppSealingSDK/*" 2>/dev/null)
+            
+            if [ -z "$HASH_SCRIPT" ]; then
+              echo "❌ ERROR: generate_hash script not found in AppSealingSDK directory"
+              exit 1
+            fi
+            
+            echo "✅ Found hash script: ${HASH_SCRIPT}"
+            chmod +x "$HASH_SCRIPT"
+            
+            # Find IPA file
+            IPA_FILE=$(find "${IPA_OUTPUT_PATH}" -type f -name "*.ipa" 2>/dev/null)
+            if [ -z "${IPA_FILE}" ]; then
+              echo "❌ ERROR: No IPA file found in ${IPA_OUTPUT_PATH}"
+              exit 1
+            fi
+            echo "✅ Found IPA file: ${IPA_FILE}"
+            
+            # Run the hash script
+            "$HASH_SCRIPT" "${IPA_FILE}"
+
+      - run:
+          name: Upload to App Store Connect
+          command: |
+            cd /Users/distiller/project/ios
+            IPA_FILE=$(find build/ios/ipa -name "*.ipa" -type f)
+            xcrun altool --upload-app \
+              --type ios \
+              --file "${IPA_FILE}" \
+              --username "$APPLE_ID" \
+              --password "$APP_SPECIFIC_PASSWORD" \
+              --verbose
+
+      - store_artifacts:
+          path: /Users/distiller/project/ios/build/ios/ipa
+
+workflows:
+  version: 2
+  build_and_deploy:
+    jobs:
+      - build_and_deploy
